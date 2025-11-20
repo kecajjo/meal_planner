@@ -22,13 +22,12 @@ trait DbWrapper {
     ) -> HashMap<String, crate::data_types::Product>;
 
     fn get_product_id(&self, product: &Product) -> String {
-        // No, Rust does not have an f-string syntax like Python.
-        // For string interpolation, use the `format!` macro:
-        format!(
-            "{} ({})",
-            product.name(),
-            product.brand().unwrap_or(&"".to_string())
-        )
+        let brand = product.brand().unwrap_or_default();
+        if brand.is_empty() {
+            product.name().to_string()
+        } else {
+            format!("{} ({})", product.name(), brand)
+        }
     }
 }
 
