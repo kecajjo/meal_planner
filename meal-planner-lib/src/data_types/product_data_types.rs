@@ -88,7 +88,7 @@ impl MacroElements {
 #[derive(EnumIter, PartialEq, Eq, Hash, Copy, Clone, Debug)]
 pub enum MicroNutrientsType {
     Fiber,
-    Salt,
+    Zinc,
     Sodium,
     Alcohol,
 }
@@ -143,7 +143,7 @@ pub struct Product {
     brand: Option<String>,
     pub macro_elements: Box<MacroElements>,
     pub micro_nutrients: Box<MicroNutrients>,
-    pub grams_per_unit: u16,
+    pub grams_per_serving: u16,
 }
 
 impl Product {
@@ -152,14 +152,14 @@ impl Product {
         brand: Option<String>,
         macro_elements: Box<MacroElements>,
         micro_nutrients: Box<MicroNutrients>,
-        grams_per_unit: u16,
+        grams_per_serving: u16,
     ) -> Self {
         Self {
             name,
             brand,
             macro_elements,
             micro_nutrients,
-            grams_per_unit,
+            grams_per_serving,
         }
     }
 
@@ -191,7 +191,7 @@ mod tests {
         assert_eq!(product.brand(), Some("TestBrand"));
         assert_eq!(product.macro_elements[MacroElemType::Fat], 1.0);
         assert_eq!(product.micro_nutrients[MicroNutrientsType::Fiber], None);
-        assert_eq!(product.grams_per_unit, 123);
+        assert_eq!(product.grams_per_serving, 123);
     }
 
     #[test]
@@ -241,7 +241,7 @@ mod tests {
     fn test_micro_nutrients_default() {
         let mn = MicroNutrients::default();
         assert_eq!(mn[MicroNutrientsType::Fiber], None);
-        assert_eq!(mn[MicroNutrientsType::Salt], None);
+        assert_eq!(mn[MicroNutrientsType::Zinc], None);
         assert_eq!(mn[MicroNutrientsType::Sodium], None);
         assert_eq!(mn[MicroNutrientsType::Alcohol], None);
     }
@@ -256,7 +256,7 @@ mod tests {
             brand: Some("Test Brand".to_string()),
             macro_elements,
             micro_nutrients,
-            grams_per_unit: 100,
+            grams_per_serving: 100,
         };
         assert_eq!(product.name, "Test Product");
         assert_eq!(product.brand.as_deref(), Some("Test Brand"));
@@ -265,8 +265,8 @@ mod tests {
             product.micro_nutrients[MicroNutrientsType::Fiber],
             Some(2.5)
         );
-        assert_eq!(product.micro_nutrients[MicroNutrientsType::Salt], None);
-        assert_eq!(product.grams_per_unit, 100);
+        assert_eq!(product.micro_nutrients[MicroNutrientsType::Zinc], None);
+        assert_eq!(product.grams_per_serving, 100);
     }
 
     #[test]
@@ -289,13 +289,13 @@ mod tests {
     fn test_micro_nutrients_add() {
         let mut mn1 = MicroNutrients::default();
         mn1[MicroNutrientsType::Fiber] = Some(1.0);
-        mn1[MicroNutrientsType::Salt] = Some(0.5);
+        mn1[MicroNutrientsType::Zinc] = Some(0.5);
         let mut mn2 = MicroNutrients::default();
         mn2[MicroNutrientsType::Fiber] = Some(2.0);
         mn2[MicroNutrientsType::Alcohol] = Some(0.1);
         let sum = &mn1 + &mn2;
         assert_eq!(sum[MicroNutrientsType::Fiber], Some(3.0));
-        assert_eq!(sum[MicroNutrientsType::Salt], Some(0.5));
+        assert_eq!(sum[MicroNutrientsType::Zinc], Some(0.5));
         assert_eq!(sum[MicroNutrientsType::Alcohol], Some(0.1));
         assert_eq!(sum[MicroNutrientsType::Sodium], None);
     }
@@ -303,10 +303,10 @@ mod tests {
     #[test]
     fn test_micro_nutrients_index_mut() {
         let mut mn = MicroNutrients::default();
-        assert_eq!(mn[MicroNutrientsType::Salt], None);
-        mn[MicroNutrientsType::Salt] = Some(1.2);
-        assert_eq!(mn[MicroNutrientsType::Salt], Some(1.2));
-        mn[MicroNutrientsType::Salt] = None;
-        assert_eq!(mn[MicroNutrientsType::Salt], None);
+        assert_eq!(mn[MicroNutrientsType::Zinc], None);
+        mn[MicroNutrientsType::Zinc] = Some(1.2);
+        assert_eq!(mn[MicroNutrientsType::Zinc], Some(1.2));
+        mn[MicroNutrientsType::Zinc] = None;
+        assert_eq!(mn[MicroNutrientsType::Zinc], None);
     }
 }

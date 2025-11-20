@@ -81,9 +81,9 @@ mod tests {
 
     #[test]
     fn test_nutrient_constraint_constructor_micro() {
-        let constraint = NutrientConstraint::new(MicroNutrientsType::Salt, None, Some(18.0));
+        let constraint = NutrientConstraint::new(MicroNutrientsType::Zinc, None, Some(18.0));
         match constraint.element {
-            NutrientType::Micro(MicroNutrientsType::Salt) => {}
+            NutrientType::Micro(MicroNutrientsType::Zinc) => {}
             _ => panic!("Expected MicroNutrientsType::Salt"),
         }
         assert_eq!(constraint.min, None);
