@@ -44,6 +44,42 @@ impl MockProductDb {
         micro_nutrients[4][MicroNutrientsType::Sodium] = Some(8.0);
         micro_nutrients[4][MicroNutrientsType::Alcohol] = Some(7.0);
         micro_nutrients[5][MicroNutrientsType::Fiber] = Some(5.0);
+        let mut grams_per_unit = vec![
+            {
+                let mut map = HashMap::new();
+                map.insert(crate::data_types::CommonUnits::Piece, 150);
+                map.insert(crate::data_types::CommonUnits::Box, 50);
+                map
+            },
+            {
+                let mut map = HashMap::new();
+                map.insert(crate::data_types::CommonUnits::Cup, 250);
+                map.insert(crate::data_types::CommonUnits::Teaspoon, 5);
+                map.insert(crate::data_types::CommonUnits::Tablespoon, 5);
+                map
+            },
+            {
+                let mut map = HashMap::new();
+                map.insert(crate::data_types::CommonUnits::Cup, 250);
+                map
+            },
+            {
+                let mut map = HashMap::new();
+                map.insert(crate::data_types::CommonUnits::Teaspoon, 1);
+                map
+            },
+            {
+                let mut map = HashMap::new();
+                map.insert(crate::data_types::CommonUnits::Box, 50);
+                map
+            },
+            {
+                let mut map = HashMap::new();
+                map.insert(crate::data_types::CommonUnits::Piece, 1);
+                map
+            },
+        ];
+
         let names = vec![
             "Apple",
             "Beer",
@@ -66,7 +102,7 @@ impl MockProductDb {
                 brands[i].clone(),
                 macro_elements[i].clone(),
                 micro_nutrients[i].clone(),
-                100,
+                grams_per_unit.pop().unwrap(),
             ));
         }
     }
@@ -130,6 +166,8 @@ impl DbWrapper for MockProductDb {
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use super::*;
     use crate::data_types::{MacroElements, MicroNutrients, Product};
 
@@ -154,7 +192,11 @@ mod tests {
             Some("BrandedOrange".to_string()),
             Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0)),
             Box::new(MicroNutrients::default()),
-            100,
+            {
+                let mut map = std::collections::HashMap::new();
+                map.insert(crate::data_types::CommonUnits::Piece, 1);
+                map
+            },
         );
         db.add_product(product.clone());
         let key = db.get_product_id(&product);
@@ -201,9 +243,19 @@ mod tests {
             let prod = db.get_mut_product(key);
             assert!(prod.is_some());
             let prod = prod.unwrap();
-            prod.grams_per_serving = 200;
+            prod.grams_per_unit = {
+                let mut map = std::collections::HashMap::new();
+                map.insert(crate::data_types::CommonUnits::Cup, 200);
+                map.insert(crate::data_types::CommonUnits::Piece, 150);
+                map
+            };
         }
-        assert_eq!(db.products[key].grams_per_serving, 200);
+        assert_eq!(db.products[key].grams_per_unit, {
+            let mut map = std::collections::HashMap::new();
+            map.insert(crate::data_types::CommonUnits::Cup, 200);
+            map.insert(crate::data_types::CommonUnits::Piece, 150);
+            map
+        });
         // Non-existent
         assert!(db.get_mut_product("NonExistent ()").is_none());
     }

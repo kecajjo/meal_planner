@@ -1,4 +1,7 @@
-use std::ops::{Add, Index, IndexMut};
+use std::{
+    hash::Hash,
+    ops::{Add, Index, IndexMut},
+};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -137,13 +140,25 @@ impl<'a, 'b> Add<&'b MicroNutrients> for &'a MicroNutrients {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CommonUnits {
+    Piece,
+    Cup,
+    Tablespoon,
+    Teaspoon,
+    Box,
+    Custom,
+}
+
+const DEFAULT_GRAMS_PER_UNIT: (CommonUnits, u16) = (CommonUnits::Piece, 1);
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Product {
     name: String,
     brand: Option<String>,
     pub macro_elements: Box<MacroElements>,
     pub micro_nutrients: Box<MicroNutrients>,
-    pub grams_per_serving: u16,
+    pub grams_per_unit: std::collections::HashMap<CommonUnits, u16>,
 }
 
 impl Product {
@@ -152,14 +167,17 @@ impl Product {
         brand: Option<String>,
         macro_elements: Box<MacroElements>,
         micro_nutrients: Box<MicroNutrients>,
-        grams_per_serving: u16,
+        mut grams_per_unit: std::collections::HashMap<CommonUnits, u16>,
     ) -> Self {
+        if grams_per_unit.is_empty() {
+            grams_per_unit.insert(DEFAULT_GRAMS_PER_UNIT.0, DEFAULT_GRAMS_PER_UNIT.1);
+        }
         Self {
             name,
             brand,
             macro_elements,
             micro_nutrients,
-            grams_per_serving,
+            grams_per_unit: grams_per_unit,
         }
     }
 
@@ -185,13 +203,19 @@ mod tests {
             Some("TestBrand".to_string()),
             macro_elements,
             micro_nutrients,
-            123,
+            {
+                let mut grams_per_unit = std::collections::HashMap::new();
+                grams_per_unit.insert(CommonUnits::Piece, 123);
+                grams_per_unit
+            },
         );
         assert_eq!(product.name(), "TestName");
         assert_eq!(product.brand(), Some("TestBrand"));
         assert_eq!(product.macro_elements[MacroElemType::Fat], 1.0);
         assert_eq!(product.micro_nutrients[MicroNutrientsType::Fiber], None);
-        assert_eq!(product.grams_per_serving, 123);
+        let mut expected_grams_per_unit = std::collections::HashMap::new();
+        expected_grams_per_unit.insert(CommonUnits::Piece, 123);
+        assert_eq!(product.grams_per_unit, expected_grams_per_unit);
     }
 
     #[test]
@@ -256,7 +280,11 @@ mod tests {
             brand: Some("Test Brand".to_string()),
             macro_elements,
             micro_nutrients,
-            grams_per_serving: 100,
+            grams_per_unit: {
+                let mut grams_per_unit = std::collections::HashMap::new();
+                grams_per_unit.insert(CommonUnits::Piece, 100);
+                grams_per_unit
+            },
         };
         assert_eq!(product.name, "Test Product");
         assert_eq!(product.brand.as_deref(), Some("Test Brand"));
@@ -266,7 +294,9 @@ mod tests {
             Some(2.5)
         );
         assert_eq!(product.micro_nutrients[MicroNutrientsType::Zinc], None);
-        assert_eq!(product.grams_per_serving, 100);
+        let mut expected_grams_per_unit = std::collections::HashMap::new();
+        expected_grams_per_unit.insert(CommonUnits::Piece, 100);
+        assert_eq!(product.grams_per_unit, expected_grams_per_unit);
     }
 
     #[test]

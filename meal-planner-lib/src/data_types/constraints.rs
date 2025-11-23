@@ -1,3 +1,5 @@
+use crate::data_types::CommonUnits;
+
 pub use super::product_data_types::{MacroElemType, MicroNutrientsType, Product};
 use std::collections::HashMap;
 
@@ -47,18 +49,56 @@ impl NutrientConstraint {
 // Constraint on a product (food item)
 #[derive(Debug)]
 pub struct ProductConstraint {
-    pub food: Box<Product>,
-    pub low_bound: Option<u16>,
-    pub up_bound: Option<u16>,
+    food: Box<Product>,
+    low_bound: Option<u16>,
+    up_bound: Option<u16>,
+    unit: CommonUnits,
 }
 
-pub struct Meal {
+impl ProductConstraint {
+    pub fn new(
+        food: Box<Product>,
+        low_bound: Option<u16>,
+        up_bound: Option<u16>,
+        unit: CommonUnits,
+    ) -> Option<Self> {
+        if !food.grams_per_unit.contains_key(&unit) {
+            return None;
+        }
+        if let (Some(lb), Some(ub)) = (low_bound, up_bound) {
+            if lb > ub {
+                return None;
+            }
+        }
+        Some(Self {
+            food,
+            low_bound,
+            up_bound,
+            unit,
+        })
+    }
+
+    pub fn food(&self) -> &Product {
+        &self.food
+    }
+    pub fn low_bound(&self) -> Option<u16> {
+        self.low_bound
+    }
+    pub fn up_bound(&self) -> Option<u16> {
+        self.up_bound
+    }
+    pub fn unit(&self) -> CommonUnits {
+        self.unit
+    }
+}
+
+pub struct MealConstraint {
     pub products: Vec<ProductConstraint>,
     pub nutrients: Vec<NutrientConstraint>,
 }
 
-pub struct DayMealPlan {
-    pub meals: HashMap<String, Meal>,
+pub struct DayMealPlanConstraint {
+    pub meals: HashMap<String, MealConstraint>,
     pub nutrients: Vec<NutrientConstraint>,
 }
 
@@ -106,59 +146,119 @@ mod tests {
         );
     }
 
+    // --- Product Constraint tests ---
+    #[test]
+    fn test_product_constraint_valid_creation() {
+        let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
+        let micro_nutrients = Box::new(MicroNutrients::default());
+        let mut grams_per_unit = std::collections::HashMap::new();
+        grams_per_unit.insert(CommonUnits::Cup, 250);
+        grams_per_unit.insert(CommonUnits::Piece, 1);
+        let product = Box::new(Product::new(
+            "Test Product".to_string(),
+            None,
+            macro_elements,
+            micro_nutrients,
+            grams_per_unit,
+        ));
+        let constraint = ProductConstraint::new(product, Some(1), Some(5), CommonUnits::Cup);
+        assert!(constraint.is_some());
+    }
+
+    #[test]
+    fn test_product_constraint_invalid_unit() {
+        let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
+        let micro_nutrients = Box::new(MicroNutrients::default());
+        let grams_per_unit = std::collections::HashMap::new(); // No units defined
+        let product = Box::new(Product::new(
+            "Test Product".to_string(),
+            None,
+            macro_elements,
+            micro_nutrients,
+            grams_per_unit,
+        ));
+        let constraint = ProductConstraint::new(product, Some(1), Some(5), CommonUnits::Cup);
+        assert!(constraint.is_none());
+    }
+
+    #[test]
+    fn test_product_constraint_invalid_bounds() {
+        let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
+        let micro_nutrients = Box::new(MicroNutrients::default());
+        let mut grams_per_unit = std::collections::HashMap::new();
+        grams_per_unit.insert(CommonUnits::Cup, 250);
+        let product = Box::new(Product::new(
+            "Test Product".to_string(),
+            None,
+            macro_elements,
+            micro_nutrients,
+            grams_per_unit,
+        ));
+        let constraint = ProductConstraint::new(product, Some(10), Some(5), CommonUnits::Cup);
+        assert!(constraint.is_none());
+    }
+
     // --- Meal tests ---
-    fn initialize_meal_with_products() -> Meal {
+    fn initialize_meal_with_products() -> MealConstraint {
         let mut macro_elements_vec = vec![
             Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0)),
             Box::new(MacroElements::new(2.0, 3.0, 4.0, 5.0, 6.0)),
+            Box::new(MacroElements::new(3.0, 4.0, 5.0, 6.0, 7.0)),
             Box::new(MacroElements::new(3.0, 4.0, 5.0, 6.0, 7.0)),
         ];
         let mut micro_nutrients_vec = vec![
             Box::new(MicroNutrients::default()),
             Box::new(MicroNutrients::default()),
             Box::new(MicroNutrients::default()),
+            Box::new(MicroNutrients::default()),
         ];
+        let mut grams1 = std::collections::HashMap::new();
+        grams1.insert(CommonUnits::Cup, 200);
+        grams1.insert(CommonUnits::Piece, 150);
+        let mut grams2 = std::collections::HashMap::new();
+        grams2.insert(CommonUnits::Tablespoon, 10);
+        let mut grams3 = std::collections::HashMap::new();
+        grams3.insert(CommonUnits::Piece, 100);
+        let mut grams4 = std::collections::HashMap::new();
+        grams4.insert(CommonUnits::Piece, 50);
         let prod1 = Box::new(Product::new(
             "Apple".to_string(),
             None,
             macro_elements_vec.pop().unwrap(),
             micro_nutrients_vec.pop().unwrap(),
-            100,
+            grams1,
         ));
         let prod2 = Box::new(Product::new(
             "Banana".to_string(),
             None,
             macro_elements_vec.pop().unwrap(),
             micro_nutrients_vec.pop().unwrap(),
-            100,
+            grams2,
         ));
         let prod3 = Box::new(Product::new(
             "Carrot".to_string(),
             None,
             macro_elements_vec.pop().unwrap(),
             micro_nutrients_vec.pop().unwrap(),
-            100,
+            grams3,
+        ));
+        let prod4 = Box::new(Product::new(
+            "Carrot".to_string(),
+            None,
+            macro_elements_vec.pop().unwrap(),
+            micro_nutrients_vec.pop().unwrap(),
+            grams4,
         ));
 
-        let pc1 = ProductConstraint {
-            food: prod1,
-            low_bound: Some(1),
-            up_bound: Some(2),
-        };
-        let pc2 = ProductConstraint {
-            food: prod2,
-            low_bound: Some(2),
-            up_bound: Some(3),
-        };
-        let pc3 = ProductConstraint {
-            food: prod3,
-            low_bound: Some(3),
-            up_bound: Some(4),
-        };
+        let pc1 = ProductConstraint::new(prod1, Some(1), Some(2), CommonUnits::Cup);
+        let pc2 = ProductConstraint::new(prod2, Some(2), Some(3), CommonUnits::Tablespoon);
+        let pc3 = ProductConstraint::new(prod3, Some(3), Some(4), CommonUnits::Custom);
+        let pc4 = ProductConstraint::new(prod4, Some(3), Some(4), CommonUnits::Piece);
         let mut products = Vec::new();
-        products.push(pc1);
-        products.push(pc2);
-        products.push(pc3);
+        products.push(pc1.unwrap());
+        products.push(pc2.unwrap());
+        assert!(pc3.is_none());
+        products.push(pc4.unwrap());
 
         let mut nutrients = Vec::new();
         nutrients.push(NutrientConstraint::new(
@@ -177,7 +277,7 @@ mod tests {
             Some(60.0),
         ));
 
-        Meal {
+        MealConstraint {
             products: products,
             nutrients: nutrients,
         }
@@ -231,16 +331,16 @@ mod tests {
     }
 
     // --- DayMealPlan tests ---
-    fn init_day_plan() -> DayMealPlan {
-        let breakfast = Meal {
+    fn init_day_plan() -> DayMealPlanConstraint {
+        let breakfast = MealConstraint {
             products: Vec::new(),
             nutrients: Vec::new(),
         };
-        let lunch = Meal {
+        let lunch = MealConstraint {
             products: Vec::new(),
             nutrients: Vec::new(),
         };
-        let dinner = Meal {
+        let dinner = MealConstraint {
             products: Vec::new(),
             nutrients: Vec::new(),
         };
@@ -248,7 +348,7 @@ mod tests {
         meals.insert("breakfast".to_string(), breakfast);
         meals.insert("lunch".to_string(), lunch);
         meals.insert("dinner".to_string(), dinner);
-        DayMealPlan {
+        DayMealPlanConstraint {
             meals,
             nutrients: Vec::new(),
         }
@@ -264,7 +364,7 @@ mod tests {
         // Insert back in the middle
         plan.meals.insert(
             keys[1].clone(),
-            Meal {
+            MealConstraint {
                 products: Vec::new(),
                 nutrients: Vec::new(),
             },
