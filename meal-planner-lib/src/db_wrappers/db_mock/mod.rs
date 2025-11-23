@@ -44,7 +44,7 @@ impl MockProductDb {
         micro_nutrients[4][MicroNutrientsType::Sodium] = Some(8.0);
         micro_nutrients[4][MicroNutrientsType::Alcohol] = Some(7.0);
         micro_nutrients[5][MicroNutrientsType::Fiber] = Some(5.0);
-        let mut grams_per_unit = vec![
+        let mut allowed_units = vec![
             {
                 let mut map = HashMap::new();
                 map.insert(crate::data_types::CommonUnits::Piece, 150);
@@ -102,7 +102,7 @@ impl MockProductDb {
                 brands[i].clone(),
                 macro_elements[i].clone(),
                 micro_nutrients[i].clone(),
-                grams_per_unit.pop().unwrap(),
+                allowed_units.pop().unwrap(),
             ));
         }
     }
@@ -119,10 +119,12 @@ impl MutableDbWrapper for MockProductDb {
         }
     }
 
-    fn edit_product(&mut self, product: Product) {
-        if self.products.contains_key(&self.get_product_id(&product)) {
-            self.add_or_modify_product(product);
+    fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
+        if !self.products.contains_key(product_id) {
+            return Err(format!("Product with ID '{}' not found.", product_id));
         }
+        self.add_or_modify_product(product);
+        Ok(())
     }
 
     fn get_mut_product(&mut self, name: &str) -> Option<&mut crate::data_types::Product> {
@@ -161,6 +163,20 @@ impl DbWrapper for MockProductDb {
         }
 
         results
+    }
+
+    fn set_product_unit(
+        &mut self,
+        product_id: &str,
+        allowed_unit: crate::data_types::CommonUnits,
+        quantity: u16,
+    ) -> Result<(), String> {
+        let product = self
+            .products
+            .get_mut(product_id)
+            .ok_or_else(|| format!("Product with ID '{}' not found.", product_id))?;
+        product.allowed_units.insert(allowed_unit, quantity);
+        Ok(())
     }
 }
 
@@ -207,13 +223,16 @@ mod tests {
     }
 
     #[test]
-    fn test_edit_product() {
+    fn test_update_product() {
         let mut db = MockProductDb::new();
         let key = "Apple (BrandedApple)";
         let mut product = db.products[key].clone();
         let new_macros = Box::new(MacroElements::new(9.0, 8.0, 7.0, 6.0, 5.0));
         product.macro_elements = new_macros.clone();
-        db.edit_product(product.clone());
+        assert!(
+            db.update_product(db.get_product_id(&product).as_str(), product.clone())
+                .is_ok()
+        );
         let updated = &db.products[key].macro_elements;
         use crate::data_types::MacroElemType;
         assert_eq!(updated[MacroElemType::Fat], new_macros[MacroElemType::Fat]);
@@ -243,14 +262,14 @@ mod tests {
             let prod = db.get_mut_product(key);
             assert!(prod.is_some());
             let prod = prod.unwrap();
-            prod.grams_per_unit = {
+            prod.allowed_units = {
                 let mut map = std::collections::HashMap::new();
                 map.insert(crate::data_types::CommonUnits::Cup, 200);
                 map.insert(crate::data_types::CommonUnits::Piece, 150);
                 map
             };
         }
-        assert_eq!(db.products[key].grams_per_unit, {
+        assert_eq!(db.products[key].allowed_units, {
             let mut map = std::collections::HashMap::new();
             map.insert(crate::data_types::CommonUnits::Cup, 200);
             map.insert(crate::data_types::CommonUnits::Piece, 150);
@@ -277,5 +296,31 @@ mod tests {
         use crate::db_wrappers::DbSearchCriteria;
         let crit = vec![DbSearchCriteria::ByBarcode("12345".to_string())];
         let _ = db.get_products_matching_criteria(&crit);
+    }
+
+    #[test]
+    fn test_set_product_unit_success() {
+        let mut db = MockProductDb::new();
+        let product_id = "Apple (BrandedApple)";
+        let unit = crate::data_types::CommonUnits::Cup;
+        let quantity = 123;
+        let result = db.set_product_unit(product_id, unit, quantity);
+        assert!(result.is_ok());
+        let product = db.products.get(product_id).unwrap();
+        assert_eq!(product.allowed_units.get(&unit), Some(&quantity));
+    }
+
+    #[test]
+    fn test_set_product_unit_error() {
+        let mut db = MockProductDb::new();
+        let product_id = "NonExistentProduct";
+        let unit = crate::data_types::CommonUnits::Cup;
+        let quantity = 123;
+        let result = db.set_product_unit(product_id, unit, quantity);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            format!("Product with ID '{}' not found.", product_id)
+        );
     }
 }

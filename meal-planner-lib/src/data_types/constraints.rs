@@ -46,6 +46,8 @@ impl NutrientConstraint {
     }
 }
 
+pub type AllowedUnitDividers = std::collections::HashMap<CommonUnits, u16>;
+
 // Constraint on a product (food item)
 #[derive(Debug)]
 pub struct ProductConstraint {
@@ -62,7 +64,7 @@ impl ProductConstraint {
         up_bound: Option<u16>,
         unit: CommonUnits,
     ) -> Option<Self> {
-        if !food.grams_per_unit.contains_key(&unit) {
+        if !food.allowed_units.contains_key(&unit) {
             return None;
         }
         if let (Some(lb), Some(ub)) = (low_bound, up_bound) {
@@ -151,15 +153,15 @@ mod tests {
     fn test_product_constraint_valid_creation() {
         let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
-        let mut grams_per_unit = std::collections::HashMap::new();
-        grams_per_unit.insert(CommonUnits::Cup, 250);
-        grams_per_unit.insert(CommonUnits::Piece, 1);
+        let mut allowed_units = std::collections::HashMap::new();
+        allowed_units.insert(CommonUnits::Cup, 250);
+        allowed_units.insert(CommonUnits::Piece, 1);
         let product = Box::new(Product::new(
             "Test Product".to_string(),
             None,
             macro_elements,
             micro_nutrients,
-            grams_per_unit,
+            allowed_units,
         ));
         let constraint = ProductConstraint::new(product, Some(1), Some(5), CommonUnits::Cup);
         assert!(constraint.is_some());
@@ -169,13 +171,13 @@ mod tests {
     fn test_product_constraint_invalid_unit() {
         let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
-        let grams_per_unit = std::collections::HashMap::new(); // No units defined
+        let allowed_units = std::collections::HashMap::new(); // No units defined
         let product = Box::new(Product::new(
             "Test Product".to_string(),
             None,
             macro_elements,
             micro_nutrients,
-            grams_per_unit,
+            allowed_units,
         ));
         let constraint = ProductConstraint::new(product, Some(1), Some(5), CommonUnits::Cup);
         assert!(constraint.is_none());
@@ -185,14 +187,14 @@ mod tests {
     fn test_product_constraint_invalid_bounds() {
         let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
-        let mut grams_per_unit = std::collections::HashMap::new();
-        grams_per_unit.insert(CommonUnits::Cup, 250);
+        let mut allowed_units = std::collections::HashMap::new();
+        allowed_units.insert(CommonUnits::Cup, 250);
         let product = Box::new(Product::new(
             "Test Product".to_string(),
             None,
             macro_elements,
             micro_nutrients,
-            grams_per_unit,
+            allowed_units,
         ));
         let constraint = ProductConstraint::new(product, Some(10), Some(5), CommonUnits::Cup);
         assert!(constraint.is_none());
