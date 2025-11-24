@@ -1,4 +1,8 @@
 pub mod constraints;
-mod product_data_types;
+mod macro_elements;
+mod micro_nutrients;
+mod product;
 
-pub use product_data_types::*;
+pub use macro_elements::*;
+pub use micro_nutrients::*;
+pub use product::*;

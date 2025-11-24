@@ -1,7 +1,7 @@
 use core::panic;
 use std::collections::HashMap;
 
-use super::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
+use super::db_wrapper::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
 use crate::data_types::{MacroElements, MicroNutrients, MicroNutrientsType, Product};
 
 pub struct MockProductDb {
