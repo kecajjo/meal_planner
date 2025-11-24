@@ -81,7 +81,7 @@ pub trait DbWrapper {
 }
 
 pub trait MutableDbWrapper: DbWrapper {
-    fn add_product(&mut self, product: crate::data_types::Product);
+    fn add_product(&mut self, product: crate::data_types::Product) -> Result<(), String>;
     fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String>;
     fn get_mut_product(&mut self, name: &str) -> Option<&mut crate::data_types::Product>;
 }

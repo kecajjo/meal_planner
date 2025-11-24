@@ -113,10 +113,15 @@ impl MockProductDb {
 }
 
 impl MutableDbWrapper for MockProductDb {
-    fn add_product(&mut self, product: crate::data_types::Product) {
-        if !self.products.contains_key(&self.get_product_id(&product)) {
-            self.add_or_modify_product(product);
+    fn add_product(&mut self, product: crate::data_types::Product) -> Result<(), String> {
+        if self.products.contains_key(&self.get_product_id(&product)) {
+            return Err(format!(
+                "Product with ID '{}' already exists.",
+                self.get_product_id(&product)
+            ));
         }
+        self.add_or_modify_product(product);
+        Ok(())
     }
 
     fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
@@ -214,11 +219,11 @@ mod tests {
                 map
             },
         );
-        db.add_product(product.clone());
+        assert!(db.add_product(product.clone()).is_ok());
         let key = db.get_product_id(&product);
         assert!(db.products.contains_key(&key));
         // Adding again should not duplicate
-        db.add_product(product);
+        assert!(db.add_product(product).is_err());
         assert_eq!(db.products.len(), 7);
     }
 
