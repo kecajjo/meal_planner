@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+const_format = "0.2.35"
 microlp = "0.2.11"
 strum = "0.27.2"
 strum_macros = "0.27.2"
+
+[target.'cfg(not(all(target_arch = "wasm32", target_os = "emscripten")))'.dependencies]
+rusqlite = "0.37.0"

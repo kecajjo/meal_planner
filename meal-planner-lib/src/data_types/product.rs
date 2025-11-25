@@ -1,8 +1,10 @@
+use core::fmt;
 use std::hash::Hash;
+use strum_macros::EnumIter;
 
 use super::{macro_elements::*, micro_nutrients::*};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter)]
 pub enum CommonUnits {
     Piece,
     Cup,
@@ -10,6 +12,20 @@ pub enum CommonUnits {
     Teaspoon,
     Box,
     Custom,
+}
+
+impl fmt::Display for CommonUnits {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let unit_str = match self {
+            CommonUnits::Piece => "piece",
+            CommonUnits::Cup => "cup",
+            CommonUnits::Tablespoon => "tablespoon",
+            CommonUnits::Teaspoon => "teaspoon",
+            CommonUnits::Box => "box",
+            CommonUnits::Custom => "custom",
+        };
+        write!(f, "{}", unit_str)
+    }
 }
 
 const DEFAULT_ALLOWED_UNITS: (CommonUnits, u16) = (CommonUnits::Piece, 1);
@@ -108,5 +124,32 @@ mod tests {
         let mut expected_allowed_units = std::collections::HashMap::new();
         expected_allowed_units.insert(CommonUnits::Piece, 100);
         assert_eq!(product.allowed_units, expected_allowed_units);
+    }
+
+    #[test]
+    fn test_product_default_allowed_units() {
+        let macro_elements = Box::new(MacroElements::new(0.0, 0.0, 0.0, 0.0, 0.0));
+        let micro_nutrients = Box::new(MicroNutrients::default());
+        let product = Product::new(
+            "NoUnits".to_string(),
+            None,
+            macro_elements,
+            micro_nutrients,
+            std::collections::HashMap::new(),
+        );
+        let mut expected_allowed_units = std::collections::HashMap::new();
+        expected_allowed_units.insert(CommonUnits::Piece, 1);
+        assert_eq!(product.allowed_units, expected_allowed_units);
+        assert_eq!(product.brand(), None);
+    }
+
+    #[test]
+    fn test_common_units_display() {
+        assert_eq!(CommonUnits::Piece.to_string(), "piece");
+        assert_eq!(CommonUnits::Cup.to_string(), "cup");
+        assert_eq!(CommonUnits::Tablespoon.to_string(), "tablespoon");
+        assert_eq!(CommonUnits::Teaspoon.to_string(), "teaspoon");
+        assert_eq!(CommonUnits::Box.to_string(), "box");
+        assert_eq!(CommonUnits::Custom.to_string(), "custom");
     }
 }

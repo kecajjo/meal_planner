@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{
     hash::Hash,
     ops::{Add, Index},
@@ -13,6 +14,20 @@ pub enum MacroElemType {
     Sugar,
     Protein,
     Calories,
+}
+
+impl fmt::Display for MacroElemType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            MacroElemType::Fat => "Fat",
+            MacroElemType::SaturatedFat => "Saturated Fat",
+            MacroElemType::Carbs => "Carbohydrates",
+            MacroElemType::Sugar => "Sugar",
+            MacroElemType::Protein => "Protein",
+            MacroElemType::Calories => "Calories",
+        };
+        write!(f, "{}", name)
+    }
 }
 
 // Macro elements per 100g
@@ -149,5 +164,58 @@ mod tests {
         }
         // calories = (3*9)+(6*4)+(4*4) = 27+24+16 = 67
         assert_eq!(sum[MacroElemType::Calories], 67.0);
+    }
+
+    #[test]
+    fn test_macro_elem_type_display() {
+        assert_eq!(MacroElemType::Fat.to_string(), "Fat");
+        assert_eq!(MacroElemType::SaturatedFat.to_string(), "Saturated Fat");
+        assert_eq!(MacroElemType::Carbs.to_string(), "Carbohydrates");
+        assert_eq!(MacroElemType::Sugar.to_string(), "Sugar");
+        assert_eq!(MacroElemType::Protein.to_string(), "Protein");
+        assert_eq!(MacroElemType::Calories.to_string(), "Calories");
+    }
+
+    #[test]
+    fn test_macro_elements_partial_eq() {
+        let me1 = MacroElements::new(1.0, 0.5, 2.0, 0.5, 3.0);
+        let me2 = MacroElements::new(1.0, 0.5, 2.0, 0.5, 3.0);
+        let me3 = MacroElements::new(2.0, 1.0, 4.0, 1.5, 1.0);
+        assert_eq!(me1, me2);
+        assert_ne!(me1, me3);
+    }
+
+    #[test]
+    fn test_macro_elements_clone() {
+        let me1 = MacroElements::new(2.0, 1.0, 4.0, 1.5, 3.0);
+        let me2 = me1.clone();
+        assert_eq!(me1, me2);
+    }
+
+    #[test]
+    fn test_macro_elements_add_ref() {
+        let me1 = MacroElements::new(1.0, 0.5, 2.0, 0.5, 3.0);
+        let me2 = MacroElements::new(2.0, 1.0, 4.0, 1.5, 1.0);
+        let sum = MacroElements::add_ref(&me1, &me2);
+        for elem in MacroElemType::iter() {
+            if elem == MacroElemType::Calories {
+                continue;
+            }
+            assert_eq!(sum[elem], me1[elem] + me2[elem]);
+        }
+        // calories = (3*9)+(6*4)+(4*4) = 27+24+16 = 67
+        assert_eq!(sum[MacroElemType::Calories], 67.0);
+    }
+
+    #[test]
+    fn test_macro_elements_index_panic() {
+        let me = MacroElements::new(1.0, 0.5, 2.0, 0.5, 3.0);
+        // Remove an element to simulate missing key
+        let mut elements = me.clone();
+        elements.elements.remove(&MacroElemType::Sugar);
+        let result = std::panic::catch_unwind(|| {
+            let _ = elements[MacroElemType::Sugar];
+        });
+        assert!(result.is_err());
     }
 }

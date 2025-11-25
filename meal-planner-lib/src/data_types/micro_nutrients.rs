@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{
     hash::Hash,
     ops::{Add, Index, IndexMut},
@@ -11,6 +12,18 @@ pub enum MicroNutrientsType {
     Zinc,
     Sodium,
     Alcohol,
+}
+
+impl fmt::Display for MicroNutrientsType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            MicroNutrientsType::Fiber => "Fiber",
+            MicroNutrientsType::Zinc => "Zinc",
+            MicroNutrientsType::Sodium => "Sodium",
+            MicroNutrientsType::Alcohol => "Alcohol",
+        };
+        write!(f, "{}", name)
+    }
 }
 
 // Micro nutrients per 100g
@@ -93,5 +106,54 @@ mod tests {
         assert_eq!(mn[MicroNutrientsType::Zinc], Some(1.2));
         mn[MicroNutrientsType::Zinc] = None;
         assert_eq!(mn[MicroNutrientsType::Zinc], None);
+    }
+
+    #[test]
+    fn test_micro_nutrients_type_display() {
+        assert_eq!(MicroNutrientsType::Fiber.to_string(), "Fiber");
+        assert_eq!(MicroNutrientsType::Zinc.to_string(), "Zinc");
+        assert_eq!(MicroNutrientsType::Sodium.to_string(), "Sodium");
+        assert_eq!(MicroNutrientsType::Alcohol.to_string(), "Alcohol");
+    }
+
+    #[test]
+    fn test_micro_nutrients_partial_eq() {
+        let mut mn1 = MicroNutrients::default();
+        let mut mn2 = MicroNutrients::default();
+        assert_eq!(mn1, mn2);
+
+        mn1[MicroNutrientsType::Fiber] = Some(1.0);
+        assert_ne!(mn1, mn2);
+
+        mn2[MicroNutrientsType::Fiber] = Some(1.0);
+        assert_eq!(mn1, mn2);
+    }
+
+    #[test]
+    fn test_micro_nutrients_clone() {
+        let mut mn1 = MicroNutrients::default();
+        mn1[MicroNutrientsType::Sodium] = Some(0.7);
+        let mn2 = mn1.clone();
+        assert_eq!(mn1, mn2);
+        assert_eq!(mn2[MicroNutrientsType::Sodium], Some(0.7));
+    }
+
+    #[test]
+    fn test_micro_nutrients_add_none_values() {
+        let mut mn1 = MicroNutrients::default();
+        mn1[MicroNutrientsType::Fiber] = None;
+        let mut mn2 = MicroNutrients::default();
+        mn2[MicroNutrientsType::Fiber] = None;
+        let sum = &mn1 + &mn2;
+        assert_eq!(sum[MicroNutrientsType::Fiber], None);
+    }
+
+    #[test]
+    fn test_micro_nutrients_add_mixed_some_none() {
+        let mut mn1 = MicroNutrients::default();
+        mn1[MicroNutrientsType::Alcohol] = Some(2.0);
+        let mn2 = MicroNutrients::default();
+        let sum = &mn1 + &mn2;
+        assert_eq!(sum[MicroNutrientsType::Alcohol], Some(2.0));
     }
 }

@@ -19,11 +19,11 @@ pub enum DbSearchCriteria {
     ByBarcode(String),
 }
 
-pub fn get_db(db_type: DataBaseTypes) -> Box<dyn DbWrapper> {
+pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn DbWrapper>> {
     match db_type {
         #[cfg(test)]
-        DataBaseTypes::MockDb => Box::new(mock_db::MockProductDb::new()),
-        DataBaseTypes::LocalDb => Box::new(local_db::LocalProductDb::new()),
+        DataBaseTypes::MockDb => Some(Box::new(mock_db::MockProductDb::new())),
+        DataBaseTypes::LocalDb => Some(Box::new(local_db::LocalProductDb::new()?)),
         _ => panic!("Database type not supported in this build."),
         // DataBaseTypes::OpenFoodFactsDb => {
         //     Box::new(open_food_facts_wrapper::OpenFoodFactsDbWrapper::new())
