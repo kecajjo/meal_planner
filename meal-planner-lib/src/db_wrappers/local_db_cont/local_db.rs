@@ -1,5 +1,7 @@
 use core::fmt;
 use std::collections::{HashMap, HashSet};
+use std::fmt::format;
+use std::result;
 use strum::IntoEnumIterator;
 
 use crate::data_types::{
@@ -57,11 +59,10 @@ impl LocalProductDb {
         if rows.next().expect("Failed to fetch row").is_none() {
             self.create_tables();
         }
-
-        // make sure MicroNutrients and AllowedUnits are up to date
     }
 
-    fn update_table_columns(&self, table_name: SqlTablesNames) -> Result<(), String> {
+    // this function should be run only after upgrading version of this library (i.e., when new micro nutrient or unit is added)
+    fn _update_table_columns(&self, table_name: SqlTablesNames) -> Result<(), String> {
         let (all_columns, col_type) = match table_name {
             t @ (SqlTablesNames::Products | SqlTablesNames::MacroElements) => {
                 return Err(format!("{} table should have all necessary columns", t));
@@ -117,8 +118,6 @@ impl LocalProductDb {
         }
 
         Ok(())
-
-        // Now `columns` contains the names of all columns in the MicroNutrients table
     }
 
     fn create_tables(&self) {
@@ -126,7 +125,7 @@ impl LocalProductDb {
             .execute(
                 format!(
                     "CREATE TABLE {} (
-                    id TEXT PRIMARY KEY,
+                    id TEXT NOT NULL PRIMARY KEY,
                     name CHAR NOT NULL,
                     brand CHAR
                 )",
@@ -139,9 +138,9 @@ impl LocalProductDb {
 
         let table_schema = format!(
             "CREATE TABLE ?1 (
-                id TEXT PRIMARY KEY,
+                id TEXT NOT NULL PRIMARY KEY,
                 ?2
-                FOREIGN KEY(product_id) REFERENCES {}(id)
+                FOREIGN KEY(id) REFERENCES {}(id)
             )",
             SqlTablesNames::Products
         );
@@ -171,7 +170,10 @@ impl LocalProductDb {
             .as_str(),
         );
 
-        let allowed_units_to_text = |x: CommonUnits| format!("{} INTEGER,\n", x);
+        let allowed_units_to_text = |x: CommonUnits| match x {
+            CommonUnits::Piece => format!("{} INTEGER NOT NULL DEFAULT 1,\n", x),
+            _ => format!("{} INTEGER,\n", x),
+        };
         let allowed_units_fields: String = CommonUnits::iter().map(allowed_units_to_text).collect();
         self.create_table_for_table_name(
             SqlTablesNames::AllowedUnits.to_string().as_str(),
@@ -194,12 +196,95 @@ impl LocalProductDb {
     }
 }
 
+fn db_search_criteria_to_sql_query_fragment(
+    criteria: &[DbSearchCriteria],
+) -> Result<String, String> {
+    if criteria.is_empty() {
+        return Err("Empty search criteria".to_string());
+    }
+    let mut query_fragment = " WHERE ".to_string();
+    for (i, criterion) in criteria.iter().enumerate() {
+        if i > 0 {
+            query_fragment.push_str(" AND ");
+        }
+        match criterion {
+            DbSearchCriteria::ByName(name) => {
+                query_fragment.push_str(&format!(
+                    "{}.name LIKE '{}%'",
+                    SqlTablesNames::Products,
+                    name
+                ));
+            }
+        }
+    }
+    Ok(query_fragment)
+}
+
+fn map_query_row_to_product(row: &rusqlite::Row) -> Result<(String, Product), rusqlite::Error> {
+    // Implementation to map a database row to a Product struct
+    unimplemented!()
+}
+
 impl DbWrapper for LocalProductDb {
     fn get_products_matching_criteria(
         &self,
-        _criteria: &[DbSearchCriteria],
+        criteria: &[DbSearchCriteria],
     ) -> HashMap<String, Product> {
-        unimplemented!()
+        let mut query_template = format!(
+            "SELECT {p}.id, {p}.name, {p}.brand",
+            p = SqlTablesNames::Products
+        );
+        // Helper closure to append columns from an enum iterator
+        let mut append_columns = |table: SqlTablesNames, iter: &mut dyn Iterator<Item = String>| {
+            for col in iter {
+                query_template.push_str(&format!(", {}.{}", table, col));
+            }
+        };
+
+        append_columns(
+            SqlTablesNames::MacroElements,
+            &mut MacroElemType::iter().map(|m| m.to_string()),
+        );
+        append_columns(
+            SqlTablesNames::MicroNutrients,
+            &mut MicroNutrientsType::iter().map(|m| m.to_string()),
+        );
+        append_columns(
+            SqlTablesNames::AllowedUnits,
+            &mut CommonUnits::iter().map(|m| m.to_string()),
+        );
+
+        query_template.push_str(&format!(
+            " FROM {p}
+            INNER JOIN {me} ON {p}.id = {me}.id
+            INNER JOIN {au} ON {p}.id = {au}.id
+            LEFT JOIN {mn} ON {p}.id = {mn}.id",
+            p = SqlTablesNames::Products,
+            me = SqlTablesNames::MacroElements,
+            au = SqlTablesNames::AllowedUnits,
+            mn = SqlTablesNames::MicroNutrients
+        ));
+
+        query_template.push_str(
+            db_search_criteria_to_sql_query_fragment(criteria)
+                .expect("Failed to convert search criteria to SQL query fragment")
+                .as_str(),
+        );
+        query_template.push(';');
+
+        let mut stmt = self
+            .sqlite_con
+            .prepare(&query_template)
+            .expect("Failed to prepare statement");
+
+        let mut result_map = HashMap::new();
+        let product_iter = stmt
+            .query_map([], |row| map_query_row_to_product(row))
+            .expect("Failed to map query results")
+            .map(|res| res.expect("Failed to map row to product"));
+
+        result_map.extend(product_iter);
+        result_map
     }
 
     fn set_product_unit(

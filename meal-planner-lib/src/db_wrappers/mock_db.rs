@@ -147,12 +147,6 @@ impl DbWrapper for MockProductDb {
                 DbSearchCriteria::ByName(name_crit) => {
                     self.get_product_id(product).starts_with(name_crit)
                 }
-                DbSearchCriteria::ByBarcode(barcode_crit) => {
-                    panic!(
-                        "Mock DB does not support search by barcode. Tried to search for {}",
-                        barcode_crit
-                    );
-                }
             }
         };
 
@@ -292,15 +286,6 @@ mod tests {
         let results = db.get_products_matching_criteria(&crit);
         assert_eq!(results.len(), 1);
         assert!(results.contains_key("Apple (BrandedApple)"));
-    }
-
-    #[test]
-    #[should_panic(expected = "Mock DB does not support search by barcode")]
-    fn test_get_products_matching_criteria_by_barcode_panics() {
-        let db = MockProductDb::new();
-        use crate::db_wrappers::DbSearchCriteria;
-        let crit = vec![DbSearchCriteria::ByBarcode("12345".to_string())];
-        let _ = db.get_products_matching_criteria(&crit);
     }
 
     #[test]

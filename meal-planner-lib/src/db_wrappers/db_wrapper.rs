@@ -16,7 +16,7 @@ pub enum DataBaseTypes {
 
 pub enum DbSearchCriteria {
     ByName(String),
-    ByBarcode(String),
+    // ByBarcode(String),
 }
 
 pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn DbWrapper>> {
