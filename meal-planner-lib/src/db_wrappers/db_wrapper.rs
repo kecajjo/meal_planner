@@ -83,7 +83,7 @@ pub trait DbWrapper {
 pub trait MutableDbWrapper: DbWrapper {
     fn add_product(&mut self, product: crate::data_types::Product) -> Result<(), String>;
     fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String>;
-    fn get_mut_product(&mut self, name: &str) -> Option<&mut crate::data_types::Product>;
+    fn delete_product(&mut self, product_id: &str) -> Result<(), String>;
 }
 
 #[cfg(test)]
@@ -105,6 +105,8 @@ mod dbwrapper_trait_default_impl_tests {
             // Only ByName supported for this dummy
             let mut map = HashMap::new();
             for crit in criteria {
+                // TODO: wont be necessary when there are more different criteria
+                #[allow(irrefutable_let_patterns)]
                 if let DbSearchCriteria::ByName(name) = crit {
                     if let Some(prod) = self.products.get(name) {
                         map.insert(name.clone(), prod.clone());

@@ -1,10 +1,10 @@
 use core::fmt;
 use std::hash::Hash;
-use strum_macros::EnumIter;
+use strum_macros::{EnumCount, EnumIter};
 
 use super::{macro_elements::*, micro_nutrients::*};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter, EnumCount)]
 pub enum CommonUnits {
     Piece,
     Cup,

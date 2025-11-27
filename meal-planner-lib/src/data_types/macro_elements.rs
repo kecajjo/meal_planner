@@ -4,9 +4,9 @@ use std::{
     ops::{Add, Index},
 };
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
+use strum_macros::{EnumCount, EnumIter};
 
-#[derive(EnumIter, PartialEq, Eq, Hash, Copy, Clone, Debug)]
+#[derive(EnumIter, PartialEq, Eq, Hash, Copy, Clone, Debug, EnumCount)]
 pub enum MacroElemType {
     Fat,
     SaturatedFat,
@@ -63,14 +63,16 @@ impl MacroElements {
         self.elements.insert(MacroElemType::Calories, calories);
     }
 
-    pub fn set(&mut self, key: MacroElemType, value: f32) {
+    pub fn set(&mut self, key: MacroElemType, value: f32) -> Result<(), String> {
         match key {
-            MacroElemType::Calories => panic!("Cannot set calories directly"),
+            MacroElemType::Calories => Err("Cannot set calories directly".to_string()),
             _ => {
                 self.elements.insert(key, value);
+                Ok(())
             }
-        }
+        }?;
         self.recompute_calories();
+        Ok(())
     }
 }
 
@@ -133,10 +135,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Cannot set calories directly")]
     fn test_macro_elements_set_invalid_key() {
         let mut me = MacroElements::new(1.0, 0.5, 2.0, 0.5, 3.0);
-        me.set(MacroElemType::Calories, 1.0);
+        assert!(me.set(MacroElemType::Calories, 1.0).is_err());
     }
 
     #[test]

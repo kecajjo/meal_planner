@@ -1,4 +1,3 @@
-use core::panic;
 use std::collections::HashMap;
 
 use super::db_wrapper::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
@@ -132,8 +131,12 @@ impl MutableDbWrapper for MockProductDb {
         Ok(())
     }
 
-    fn get_mut_product(&mut self, name: &str) -> Option<&mut crate::data_types::Product> {
-        self.products.get_mut(name)
+    fn delete_product(&mut self, product_id: &str) -> Result<(), String> {
+        if self.products.remove(product_id).is_some() {
+            Ok(())
+        } else {
+            Err(format!("Product with ID '{}' not found.", product_id))
+        }
     }
 }
 
@@ -251,31 +254,6 @@ mod tests {
             updated[MacroElemType::Protein],
             new_macros[MacroElemType::Protein]
         );
-    }
-
-    #[test]
-    fn test_get_mut_product() {
-        let mut db = MockProductDb::new();
-        let key = "Apple (BrandedApple)";
-        {
-            let prod = db.get_mut_product(key);
-            assert!(prod.is_some());
-            let prod = prod.unwrap();
-            prod.allowed_units = {
-                let mut map = std::collections::HashMap::new();
-                map.insert(crate::data_types::CommonUnits::Cup, 200);
-                map.insert(crate::data_types::CommonUnits::Piece, 150);
-                map
-            };
-        }
-        assert_eq!(db.products[key].allowed_units, {
-            let mut map = std::collections::HashMap::new();
-            map.insert(crate::data_types::CommonUnits::Cup, 200);
-            map.insert(crate::data_types::CommonUnits::Piece, 150);
-            map
-        });
-        // Non-existent
-        assert!(db.get_mut_product("NonExistent ()").is_none());
     }
 
     #[test]

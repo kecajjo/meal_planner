@@ -4,9 +4,9 @@ use std::{
     ops::{Add, Index, IndexMut},
 };
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
+use strum_macros::{EnumCount, EnumIter};
 
-#[derive(EnumIter, PartialEq, Eq, Hash, Copy, Clone, Debug)]
+#[derive(EnumIter, PartialEq, Eq, Hash, Copy, Clone, Debug, EnumCount)]
 pub enum MicroNutrientsType {
     Fiber,
     Zinc,
