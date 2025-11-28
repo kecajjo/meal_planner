@@ -30,7 +30,7 @@ impl fmt::Display for MacroElementsType {
     }
 }
 
-// Macro elements per 100g
+/// Macro elements per 100g
 #[derive(Debug, Clone, PartialEq)]
 pub struct MacroElements {
     elements: std::collections::HashMap<MacroElementsType, f32>,
@@ -77,6 +77,40 @@ impl MacroElements {
         self.recompute_calories();
         Ok(())
     }
+
+    pub fn add_ref(lhs: &MacroElements, rhs: &MacroElements) -> MacroElements {
+        let mut elements = std::collections::HashMap::new();
+        for elem in MacroElementsType::iter() {
+            let value = lhs[elem] + rhs[elem];
+            elements.insert(elem, value);
+        }
+        let mut result = MacroElements { elements };
+        result.recompute_calories();
+        result
+    }
+}
+
+pub struct MacroElementsIter {
+    inner: std::collections::hash_map::IntoIter<MacroElementsType, f32>,
+}
+
+impl IntoIterator for MacroElements {
+    type Item = (MacroElementsType, f32);
+    type IntoIter = MacroElementsIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        MacroElementsIter {
+            inner: self.elements.clone().into_iter(),
+        }
+    }
+}
+
+impl Iterator for MacroElementsIter {
+    type Item = (MacroElementsType, f32);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
 }
 
 impl Index<MacroElementsType> for MacroElements {
@@ -92,19 +126,6 @@ impl<'a, 'b> Add<&'b MacroElements> for &'a MacroElements {
 
     fn add(self, rhs: &'b MacroElements) -> MacroElements {
         MacroElements::add_ref(self, rhs)
-    }
-}
-
-impl MacroElements {
-    pub fn add_ref(lhs: &MacroElements, rhs: &MacroElements) -> MacroElements {
-        let mut elements = std::collections::HashMap::new();
-        for elem in MacroElementsType::iter() {
-            let value = lhs[elem] + rhs[elem];
-            elements.insert(elem, value);
-        }
-        let mut result = MacroElements { elements };
-        result.recompute_calories();
-        result
     }
 }
 
@@ -221,5 +242,30 @@ mod tests {
             let _ = elements[MacroElementsType::Sugar];
         });
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_macro_elements_into_iter() {
+        let me = MacroElements::new(2.0, 1.0, 4.0, 1.5, 3.0);
+        let mut collected: std::collections::HashMap<MacroElementsType, f32> =
+            me.clone().into_iter().collect();
+
+        for elem in MacroElementsType::iter() {
+            assert_eq!(collected.remove(&elem), Some(me[elem]));
+        }
+        assert!(collected.is_empty());
+    }
+
+    #[test]
+    fn test_macro_elements_iter_order_and_values() {
+        let me = MacroElements::new(5.0, 2.0, 7.0, 1.0, 3.0);
+        let mut iter = me.clone().into_iter();
+        let mut seen = std::collections::HashSet::new();
+
+        while let Some((elem_type, value)) = iter.next() {
+            assert_eq!(value, me[elem_type]);
+            assert!(seen.insert(elem_type), "Duplicate element in iterator");
+        }
+        assert_eq!(seen.len(), MacroElementsType::iter().count());
     }
 }

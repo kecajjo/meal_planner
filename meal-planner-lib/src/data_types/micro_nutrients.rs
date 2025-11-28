@@ -39,6 +39,50 @@ impl Default for MicroNutrients {
     }
 }
 
+pub struct MicroNutrientsIter {
+    inner: std::collections::hash_map::IntoIter<MicroNutrientsType, Option<f32>>,
+}
+
+impl IntoIterator for MicroNutrients {
+    type Item = (MicroNutrientsType, Option<f32>);
+    type IntoIter = MicroNutrientsIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        MicroNutrientsIter {
+            inner: self.elements.into_iter(),
+        }
+    }
+}
+
+impl Iterator for MicroNutrientsIter {
+    type Item = (MicroNutrientsType, Option<f32>);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+pub struct MicroNutrientsIterMut<'a> {
+    inner: std::collections::hash_map::IterMut<'a, MicroNutrientsType, Option<f32>>,
+}
+
+impl<'a> IntoIterator for &'a mut MicroNutrients {
+    type Item = (MicroNutrientsType, &'a mut Option<f32>);
+    type IntoIter = MicroNutrientsIterMut<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        MicroNutrientsIterMut {
+            inner: self.elements.iter_mut(),
+        }
+    }
+}
+
+impl<'a> Iterator for MicroNutrientsIterMut<'a> {
+    type Item = (MicroNutrientsType, &'a mut Option<f32>);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|(k, v)| (*k, v))
+    }
+}
+
 impl Index<MicroNutrientsType> for MicroNutrients {
     type Output = Option<f32>;
 
@@ -155,5 +199,59 @@ mod tests {
         let mn2 = MicroNutrients::default();
         let sum = &mn1 + &mn2;
         assert_eq!(sum[MicroNutrientsType::Alcohol], Some(2.0));
+    }
+
+    #[test]
+    fn test_micro_nutrients_into_iter() {
+        let mut mn = MicroNutrients::default();
+        mn[MicroNutrientsType::Fiber] = Some(1.0);
+        mn[MicroNutrientsType::Zinc] = Some(2.0);
+
+        let mut items: Vec<_> = mn.clone().into_iter().collect();
+        items.sort_by_key(|(k, _)| *k as usize);
+
+        // Only Fiber and Zinc should be present in the iterator
+        assert_eq!(
+            items,
+            vec![
+                (MicroNutrientsType::Fiber, Some(1.0)),
+                (MicroNutrientsType::Zinc, Some(2.0)),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_micro_nutrients_iter_mut() {
+        let mut mn = MicroNutrients::default();
+        mn[MicroNutrientsType::Fiber] = Some(1.0);
+        mn[MicroNutrientsType::Zinc] = Some(2.0);
+
+        for (nutrient, value) in &mut mn {
+            if nutrient == MicroNutrientsType::Fiber {
+                *value = Some(10.0);
+            }
+            if nutrient == MicroNutrientsType::Zinc {
+                *value = Some(20.0);
+            }
+        }
+
+        assert_eq!(mn[MicroNutrientsType::Fiber], Some(10.0));
+        assert_eq!(mn[MicroNutrientsType::Zinc], Some(20.0));
+        assert_eq!(mn[MicroNutrientsType::Sodium], None);
+        assert_eq!(mn[MicroNutrientsType::Alcohol], None);
+    }
+
+    #[test]
+    fn test_micro_nutrients_iter_mut_set_none() {
+        let mut mn = MicroNutrients::default();
+        mn[MicroNutrientsType::Alcohol] = Some(5.0);
+
+        for (nutrient, value) in &mut mn {
+            if nutrient == MicroNutrientsType::Alcohol {
+                *value = None;
+            }
+        }
+
+        assert_eq!(mn[MicroNutrientsType::Alcohol], None);
     }
 }

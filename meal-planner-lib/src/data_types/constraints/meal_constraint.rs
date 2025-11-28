@@ -11,7 +11,9 @@ mod tests {
 
     use super::super::*;
     use super::*;
-    use crate::data_types::{AllowedUnitsType, MacroElementsType, MacroElements, MicroNutrients, Product};
+    use crate::data_types::{
+        AllowedUnitsType, MacroElements, MacroElementsType, MicroNutrients, Product,
+    };
 
     fn initialize_meal_with_products() -> MealConstraint {
         let mut macro_elements_vec = vec![
@@ -75,11 +77,14 @@ mod tests {
         products.push(pc4.unwrap());
 
         let mut nutrients = Vec::new();
+        nutrients.push(
+            NutrientConstraint::new(MacroElementsType::Protein, Some(10.0), Some(20.0)).unwrap(),
+        );
         nutrients
-            .push(NutrientConstraint::new(MacroElementsType::Protein, Some(10.0), Some(20.0)).unwrap());
-        nutrients.push(NutrientConstraint::new(MacroElementsType::Fat, Some(5.0), Some(15.0)).unwrap());
-        nutrients
-            .push(NutrientConstraint::new(MacroElementsType::Carbs, Some(30.0), Some(60.0)).unwrap());
+            .push(NutrientConstraint::new(MacroElementsType::Fat, Some(5.0), Some(15.0)).unwrap());
+        nutrients.push(
+            NutrientConstraint::new(MacroElementsType::Carbs, Some(30.0), Some(60.0)).unwrap(),
+        );
 
         MealConstraint {
             products: products,
@@ -101,7 +106,10 @@ mod tests {
         let mut meal = initialize_meal_with_products();
         // Remove from middle (second nutrient)
         let removed = meal.nutrients.remove(1);
-        assert_eq!(removed.element(), NutrientType::Macro(MacroElementsType::Fat));
+        assert_eq!(
+            removed.element(),
+            NutrientType::Macro(MacroElementsType::Fat)
+        );
         assert_eq!(
             meal.nutrients[1].element(),
             NutrientType::Macro(MacroElementsType::Carbs)

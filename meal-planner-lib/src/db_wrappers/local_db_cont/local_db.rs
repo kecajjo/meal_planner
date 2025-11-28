@@ -229,19 +229,19 @@ fn db_search_criteria_to_sql_query_fragment(
     Ok(query_fragment)
 }
 
-enum SelectColumnIndexToProductData {
-    Id = 0,
-    Name = 1,
-    Brand = 2,
-    MacroElementsStart = 3,
-    // -1 because Calories are not to be inside DB
-    MicroNutrientsStart = 3 + MacroElementsType::COUNT as isize - 1,
-    // -1 because Calories are not to be inside DB
-    AllowedUnitsStart =
-        3 + MacroElementsType::COUNT as isize + MicroNutrientsType::COUNT as isize - 1,
-}
-
 fn map_query_row_to_product(row: &rusqlite::Row) -> Result<(String, Product), rusqlite::Error> {
+    enum SelectColumnIndexToProductData {
+        Id = 0,
+        Name = 1,
+        Brand = 2,
+        MacroElementsStart = 3,
+        // -1 because Calories are not to be inside DB
+        MicroNutrientsStart = 3 + MacroElementsType::COUNT as isize - 1,
+        // -1 because Calories are not to be inside DB
+        AllowedUnitsStart =
+            3 + MacroElementsType::COUNT as isize + MicroNutrientsType::COUNT as isize - 1,
+    }
+
     let name = row.get_unwrap(SelectColumnIndexToProductData::Name as usize);
     let brand = row.get_unwrap(SelectColumnIndexToProductData::Brand as usize);
 
@@ -276,6 +276,7 @@ fn map_query_row_to_product(row: &rusqlite::Row) -> Result<(String, Product), ru
             allowed_units.insert(unit, qty);
         }
     }
+
     let product = Product::new(
         name,
         brand,
@@ -337,7 +338,6 @@ impl DbWrapper for LocalProductDb {
             au = SqlTablesNames::AllowedUnits,
             mn = SqlTablesNames::MicroNutrients
         ));
-
         query_template.push_str(
             db_search_criteria_to_sql_query_fragment(criteria)
                 .expect("Failed to convert search criteria to SQL query fragment")
@@ -400,8 +400,9 @@ impl MutableDbWrapper for LocalProductDb {
                     })?;
                 Ok(())
             };
+
         run_query(
-            SqlTablesNames::Products.to_string().as_str(),
+            &SqlTablesNames::Products.to_string(),
             "id, name, brand",
             format!(
                 "{}, {}, {}",
@@ -484,13 +485,11 @@ impl MutableDbWrapper for LocalProductDb {
             MacroElementsType,
             SqlTablesNames::MacroElements
         );
-
         add_product_macro_micro_units!(
             MicroNutrients,
             MicroNutrientsType,
             SqlTablesNames::MicroNutrients
         );
-
         add_product_macro_micro_units!(
             AllowedUnits,
             AllowedUnitsType,
@@ -501,7 +500,65 @@ impl MutableDbWrapper for LocalProductDb {
     }
 
     fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
-        unimplemented!()
+        let query_template = format!("UPDATE ?1 SET ?2 = ?3 where id = {}", product_id);
+        let run_query = |table: &str, col: &str, val: &str| {
+            self.sqlite_con
+                .execute(&query_template, [table, col, val])
+                .expect(&format!(
+                    "Failed to update {col} for {id}",
+                    col = col,
+                    id = product_id
+                ));
+        };
+
+        for (col, val) in vec![
+            ("name", product.name()),
+            ("brand", product.brand().unwrap_or("NULL")),
+        ] {
+            run_query(&SqlTablesNames::Products.to_string(), col, val);
+        }
+
+        for (col, val) in product.macro_elements.into_iter().filter(|x| {
+            if MacroElementsType::Calories == x.0 {
+                return false;
+            } else {
+                return true;
+            }
+        }) {
+            run_query(
+                &SqlTablesNames::MacroElements.to_string(),
+                &col.to_string(),
+                &val.to_string(),
+            );
+        }
+
+        for col in MicroNutrientsType::iter() {
+            let value = if product.micro_nutrients[col].is_some() {
+                product.micro_nutrients[col].unwrap().to_string()
+            } else {
+                "NULL".to_string()
+            };
+            run_query(
+                &SqlTablesNames::MicroNutrients.to_string(),
+                &col.to_string(),
+                &value,
+            );
+        }
+
+        for col in AllowedUnitsType::iter() {
+            let value = if product.allowed_units.get(&col).is_some() {
+                product.allowed_units.get(&col).unwrap().to_string()
+            } else {
+                "NULL".to_string()
+            };
+            run_query(
+                &SqlTablesNames::AllowedUnits.to_string(),
+                &col.to_string(),
+                &value,
+            );
+        }
+
+        Ok(())
     }
 
     fn delete_product(&mut self, product_id: &str) -> Result<(), String> {
