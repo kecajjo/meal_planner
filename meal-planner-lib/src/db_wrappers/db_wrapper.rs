@@ -37,7 +37,7 @@ pub trait DbWrapper {
         criteria: &[DbSearchCriteria],
     ) -> HashMap<String, crate::data_types::Product>;
 
-    fn get_product_id(&self, product: &Product) -> String {
+    fn get_product_default_id(&self, product: &Product) -> String {
         let brand = product.brand().unwrap_or_default();
         if brand.is_empty() {
             product.name().to_string()
@@ -53,23 +53,27 @@ pub trait DbWrapper {
         quantity: u16,
     ) -> Result<(), String>;
 
-    fn update_product_units(&mut self, product: &crate::data_types::Product) -> Result<(), String> {
-        for (unit, qty) in &product.allowed_units {
-            self.set_product_unit(&self.get_product_id(product), *unit, *qty)?;
+    fn update_product_units(
+        &mut self,
+        product_id: &str,
+        allowed_units: &crate::data_types::AllowedUnits,
+    ) -> Result<(), String> {
+        for (unit, qty) in allowed_units {
+            self.set_product_unit(product_id, *unit, *qty)?;
         }
         Ok(())
     }
 
     fn clone_product_units(
         &mut self,
-        source_product: &crate::data_types::Product,
+        source_units: &crate::data_types::AllowedUnits,
         target_product_id: &str,
     ) -> Result<(), String> {
         let mut dest_prod = self
             .get_product_by_id(target_product_id)
             .ok_or_else(|| format!("Product with ID '{}' not found.", target_product_id))?;
-        dest_prod.allowed_units = source_product.allowed_units.clone();
-        self.update_product_units(&dest_prod)?;
+        dest_prod.allowed_units = source_units.clone();
+        self.update_product_units(target_product_id, &dest_prod.allowed_units)?;
         Ok(())
     }
 
@@ -81,7 +85,11 @@ pub trait DbWrapper {
 }
 
 pub trait MutableDbWrapper: DbWrapper {
-    fn add_product(&mut self, product: crate::data_types::Product) -> Result<(), String>;
+    fn add_product(
+        &mut self,
+        product_id: &str,
+        product: crate::data_types::Product,
+    ) -> Result<(), String>;
     fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String>;
     fn delete_product(&mut self, product_id: &str) -> Result<(), String>;
 }
@@ -155,8 +163,8 @@ mod dbwrapper_trait_default_impl_tests {
         };
         let prod1 = make_product("Apple", Some("BrandA"));
         let prod2 = make_product("Banana", None);
-        assert_eq!(db.get_product_id(&prod1), "Apple (BrandA)");
-        assert_eq!(db.get_product_id(&prod2), "Banana");
+        assert_eq!(db.get_product_default_id(&prod1), "Apple (BrandA)");
+        assert_eq!(db.get_product_default_id(&prod2), "Banana");
     }
 
     #[test]
@@ -168,7 +176,10 @@ mod dbwrapper_trait_default_impl_tests {
             products,
             set_calls: std::cell::RefCell::new(vec![]),
         };
-        let result = db.update_product_units(&prod);
+        let result = db.update_product_units(
+            db.get_product_default_id(&prod).as_str(),
+            &prod.allowed_units,
+        );
         assert!(result.is_ok());
         let calls = db.set_calls.borrow();
         assert_eq!(calls.len(), 1);
@@ -189,7 +200,7 @@ mod dbwrapper_trait_default_impl_tests {
             products,
             set_calls: std::cell::RefCell::new(vec![]),
         };
-        let result = db.clone_product_units(&source, "Banana (BrandB)");
+        let result = db.clone_product_units(&source.allowed_units, "Banana (BrandB)");
         assert!(result.is_ok());
         // Should have called set_product_unit for each allowed_unit in source
         let calls = db.set_calls.borrow();
@@ -209,7 +220,7 @@ mod dbwrapper_trait_default_impl_tests {
             products,
             set_calls: std::cell::RefCell::new(vec![]),
         };
-        let result = db.clone_product_units(&source, "NonExistent");
+        let result = db.clone_product_units(&source.allowed_units, "NonExistent");
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),

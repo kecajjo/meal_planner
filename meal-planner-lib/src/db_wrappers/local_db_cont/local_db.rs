@@ -386,9 +386,8 @@ impl DbWrapper for LocalProductDb {
 }
 
 impl MutableDbWrapper for LocalProductDb {
-    fn add_product(&mut self, product: Product) -> Result<(), String> {
+    fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         let query_template = "INSERT INTO ?1 (?2) VALUES (?3);";
-        let product_id = self.get_product_id(&product);
         let run_query =
             |table_name: &str, columns_str: &str, values_str: &str| -> Result<(), String> {
                 self.sqlite_con
@@ -475,7 +474,7 @@ impl MutableDbWrapper for LocalProductDb {
                 run_query(
                     $sql_table_var.to_string().as_str(),
                     format!("id, {}", col_names).as_str(),
-                    format!("{}, {}", self.get_product_id(&product), values).as_str(),
+                    format!("{}, {}", self.get_product_default_id(&product), values).as_str(),
                 )?;
             };
         }

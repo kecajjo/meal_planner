@@ -127,9 +127,9 @@ mod tests {
     #[test]
     fn test_macro_elements_set_and_recompute_calories() {
         let mut me = MacroElements::new(1.0, 0.5, 2.0, 0.5, 3.0);
-        me.set(MacroElementsType::Fat, 5.0);
-        me.set(MacroElementsType::Carbs, 10.0);
-        me.set(MacroElementsType::Protein, 8.0);
+        assert!(me.set(MacroElementsType::Fat, 5.0).is_ok());
+        assert!(me.set(MacroElementsType::Carbs, 10.0).is_ok());
+        assert!(me.set(MacroElementsType::Protein, 8.0).is_ok());
         // calories = (5*9) + (10*4) + (8*4) = 45 + 40 + 32 = 117
         assert_eq!(me[MacroElementsType::Fat], 5.0);
         assert_eq!(me[MacroElementsType::Carbs], 10.0);
