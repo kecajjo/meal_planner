@@ -5,7 +5,7 @@ use strum_macros::{EnumCount, EnumIter};
 use super::{macro_elements::*, micro_nutrients::*};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter, EnumCount)]
-pub enum CommonUnits {
+pub enum AllowedUnitsType {
     Piece,
     Cup,
     Tablespoon,
@@ -14,22 +14,22 @@ pub enum CommonUnits {
     Custom,
 }
 
-impl fmt::Display for CommonUnits {
+impl fmt::Display for AllowedUnitsType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let unit_str = match self {
-            CommonUnits::Piece => "piece",
-            CommonUnits::Cup => "cup",
-            CommonUnits::Tablespoon => "tablespoon",
-            CommonUnits::Teaspoon => "teaspoon",
-            CommonUnits::Box => "box",
-            CommonUnits::Custom => "custom",
+            AllowedUnitsType::Piece => "piece",
+            AllowedUnitsType::Cup => "cup",
+            AllowedUnitsType::Tablespoon => "tablespoon",
+            AllowedUnitsType::Teaspoon => "teaspoon",
+            AllowedUnitsType::Box => "box",
+            AllowedUnitsType::Custom => "custom",
         };
         write!(f, "{}", unit_str)
     }
 }
 
-const DEFAULT_ALLOWED_UNITS: (CommonUnits, u16) = (CommonUnits::Piece, 1);
-pub type AllowedUnits = std::collections::HashMap<CommonUnits, u16>;
+const DEFAULT_ALLOWED_UNITS: (AllowedUnitsType, u16) = (AllowedUnitsType::Piece, 1);
+pub type AllowedUnits = std::collections::HashMap<AllowedUnitsType, u16>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Product {
@@ -84,16 +84,16 @@ mod tests {
             micro_nutrients,
             {
                 let mut allowed_units = std::collections::HashMap::new();
-                allowed_units.insert(CommonUnits::Piece, 123);
+                allowed_units.insert(AllowedUnitsType::Piece, 123);
                 allowed_units
             },
         );
         assert_eq!(product.name(), "TestName");
         assert_eq!(product.brand(), Some("TestBrand"));
-        assert_eq!(product.macro_elements[MacroElemType::Fat], 1.0);
+        assert_eq!(product.macro_elements[MacroElementsType::Fat], 1.0);
         assert_eq!(product.micro_nutrients[MicroNutrientsType::Fiber], None);
         let mut expected_allowed_units = std::collections::HashMap::new();
-        expected_allowed_units.insert(CommonUnits::Piece, 123);
+        expected_allowed_units.insert(AllowedUnitsType::Piece, 123);
         assert_eq!(product.allowed_units, expected_allowed_units);
     }
 
@@ -109,20 +109,20 @@ mod tests {
             micro_nutrients,
             allowed_units: {
                 let mut allowed_units = std::collections::HashMap::new();
-                allowed_units.insert(CommonUnits::Piece, 100);
+                allowed_units.insert(AllowedUnitsType::Piece, 100);
                 allowed_units
             },
         };
         assert_eq!(product.name, "Test Product");
         assert_eq!(product.brand.as_deref(), Some("Test Brand"));
-        assert_eq!(product.macro_elements[MacroElemType::Fat], 1.0);
+        assert_eq!(product.macro_elements[MacroElementsType::Fat], 1.0);
         assert_eq!(
             product.micro_nutrients[MicroNutrientsType::Fiber],
             Some(2.5)
         );
         assert_eq!(product.micro_nutrients[MicroNutrientsType::Zinc], None);
         let mut expected_allowed_units = std::collections::HashMap::new();
-        expected_allowed_units.insert(CommonUnits::Piece, 100);
+        expected_allowed_units.insert(AllowedUnitsType::Piece, 100);
         assert_eq!(product.allowed_units, expected_allowed_units);
     }
 
@@ -138,18 +138,18 @@ mod tests {
             std::collections::HashMap::new(),
         );
         let mut expected_allowed_units = std::collections::HashMap::new();
-        expected_allowed_units.insert(CommonUnits::Piece, 1);
+        expected_allowed_units.insert(AllowedUnitsType::Piece, 1);
         assert_eq!(product.allowed_units, expected_allowed_units);
         assert_eq!(product.brand(), None);
     }
 
     #[test]
     fn test_common_units_display() {
-        assert_eq!(CommonUnits::Piece.to_string(), "piece");
-        assert_eq!(CommonUnits::Cup.to_string(), "cup");
-        assert_eq!(CommonUnits::Tablespoon.to_string(), "tablespoon");
-        assert_eq!(CommonUnits::Teaspoon.to_string(), "teaspoon");
-        assert_eq!(CommonUnits::Box.to_string(), "box");
-        assert_eq!(CommonUnits::Custom.to_string(), "custom");
+        assert_eq!(AllowedUnitsType::Piece.to_string(), "piece");
+        assert_eq!(AllowedUnitsType::Cup.to_string(), "cup");
+        assert_eq!(AllowedUnitsType::Tablespoon.to_string(), "tablespoon");
+        assert_eq!(AllowedUnitsType::Teaspoon.to_string(), "teaspoon");
+        assert_eq!(AllowedUnitsType::Box.to_string(), "box");
+        assert_eq!(AllowedUnitsType::Custom.to_string(), "custom");
     }
 }

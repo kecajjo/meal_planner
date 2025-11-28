@@ -1,6 +1,6 @@
 use crate::data_types::*;
 
-pub type AllowedUnitDividers = std::collections::HashMap<CommonUnits, u16>;
+pub type AllowedUnitDividers = std::collections::HashMap<AllowedUnitsType, u16>;
 
 // Constraint on a product (food item)
 #[derive(Debug)]
@@ -8,7 +8,7 @@ pub struct ProductConstraint {
     food: Box<Product>,
     low_bound: Option<u16>,
     up_bound: Option<u16>,
-    unit: CommonUnits,
+    unit: AllowedUnitsType,
 }
 
 impl ProductConstraint {
@@ -16,7 +16,7 @@ impl ProductConstraint {
         food: Box<Product>,
         low_bound: Option<u16>,
         up_bound: Option<u16>,
-        unit: CommonUnits,
+        unit: AllowedUnitsType,
     ) -> Option<Self> {
         if !food.allowed_units.contains_key(&unit) {
             return None;
@@ -43,7 +43,7 @@ impl ProductConstraint {
     pub fn up_bound(&self) -> Option<u16> {
         self.up_bound
     }
-    pub fn unit(&self) -> CommonUnits {
+    pub fn unit(&self) -> AllowedUnitsType {
         self.unit
     }
     pub fn update(&mut self, other: ProductConstraint) {
@@ -60,8 +60,8 @@ mod tests {
         let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
         let mut allowed_units = std::collections::HashMap::new();
-        allowed_units.insert(CommonUnits::Cup, 250);
-        allowed_units.insert(CommonUnits::Piece, 1);
+        allowed_units.insert(AllowedUnitsType::Cup, 250);
+        allowed_units.insert(AllowedUnitsType::Piece, 1);
         let product = Box::new(Product::new(
             "Test Product".to_string(),
             None,
@@ -69,7 +69,7 @@ mod tests {
             micro_nutrients,
             allowed_units,
         ));
-        let constraint = ProductConstraint::new(product, Some(1), Some(5), CommonUnits::Cup);
+        let constraint = ProductConstraint::new(product, Some(1), Some(5), AllowedUnitsType::Cup);
         assert!(constraint.is_some());
     }
 
@@ -85,7 +85,7 @@ mod tests {
             micro_nutrients,
             allowed_units,
         ));
-        let constraint = ProductConstraint::new(product, Some(1), Some(5), CommonUnits::Cup);
+        let constraint = ProductConstraint::new(product, Some(1), Some(5), AllowedUnitsType::Cup);
         assert!(constraint.is_none());
     }
 
@@ -94,7 +94,7 @@ mod tests {
         let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
         let mut allowed_units = std::collections::HashMap::new();
-        allowed_units.insert(CommonUnits::Cup, 250);
+        allowed_units.insert(AllowedUnitsType::Cup, 250);
         let product = Box::new(Product::new(
             "Test Product".to_string(),
             None,
@@ -102,7 +102,7 @@ mod tests {
             micro_nutrients,
             allowed_units,
         ));
-        let constraint = ProductConstraint::new(product, Some(10), Some(5), CommonUnits::Cup);
+        let constraint = ProductConstraint::new(product, Some(10), Some(5), AllowedUnitsType::Cup);
         assert!(constraint.is_none());
     }
 
@@ -111,8 +111,8 @@ mod tests {
         let macro_elements1 = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients1 = Box::new(MicroNutrients::default());
         let mut allowed_units1 = std::collections::HashMap::new();
-        allowed_units1.insert(CommonUnits::Cup, 250);
-        allowed_units1.insert(CommonUnits::Piece, 1);
+        allowed_units1.insert(AllowedUnitsType::Cup, 250);
+        allowed_units1.insert(AllowedUnitsType::Piece, 1);
         let product1 = Box::new(Product::new(
             "Product 1".to_string(),
             None,
@@ -121,12 +121,12 @@ mod tests {
             allowed_units1,
         ));
         let mut constraint1 =
-            ProductConstraint::new(product1, Some(1), Some(5), CommonUnits::Cup).unwrap();
+            ProductConstraint::new(product1, Some(1), Some(5), AllowedUnitsType::Cup).unwrap();
 
         let macro_elements2 = Box::new(MacroElements::new(10.0, 20.0, 30.0, 40.0, 50.0));
         let micro_nutrients2 = Box::new(MicroNutrients::default());
         let mut allowed_units2 = std::collections::HashMap::new();
-        allowed_units2.insert(CommonUnits::Piece, 1);
+        allowed_units2.insert(AllowedUnitsType::Piece, 1);
         let product2 = Box::new(Product::new(
             "Product 2".to_string(),
             None,
@@ -135,14 +135,14 @@ mod tests {
             allowed_units2,
         ));
         let constraint2 =
-            ProductConstraint::new(product2, Some(2), Some(10), CommonUnits::Piece).unwrap();
+            ProductConstraint::new(product2, Some(2), Some(10), AllowedUnitsType::Piece).unwrap();
 
         constraint1.update(constraint2);
 
         assert_eq!(constraint1.food().name(), "Product 2");
         assert_eq!(constraint1.low_bound(), Some(2));
         assert_eq!(constraint1.up_bound(), Some(10));
-        assert_eq!(constraint1.unit(), CommonUnits::Piece);
+        assert_eq!(constraint1.unit(), AllowedUnitsType::Piece);
     }
 
     #[test]
@@ -150,7 +150,7 @@ mod tests {
         let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
         let mut allowed_units = std::collections::HashMap::new();
-        allowed_units.insert(CommonUnits::Cup, 250);
+        allowed_units.insert(AllowedUnitsType::Cup, 250);
         let product = Box::new(Product::new(
             "Test Product".to_string(),
             None,
@@ -158,7 +158,7 @@ mod tests {
             micro_nutrients,
             allowed_units,
         ));
-        let constraint = ProductConstraint::new(product, None, None, CommonUnits::Cup);
+        let constraint = ProductConstraint::new(product, None, None, AllowedUnitsType::Cup);
         assert!(constraint.is_some());
         let constraint = constraint.unwrap();
         assert_eq!(constraint.low_bound(), None);
@@ -170,7 +170,7 @@ mod tests {
         let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
         let mut allowed_units = std::collections::HashMap::new();
-        allowed_units.insert(CommonUnits::Cup, 250);
+        allowed_units.insert(AllowedUnitsType::Cup, 250);
         let product = Box::new(Product::new(
             "Test Product".to_string(),
             None,
@@ -178,7 +178,7 @@ mod tests {
             micro_nutrients,
             allowed_units,
         ));
-        let constraint = ProductConstraint::new(product, Some(3), Some(3), CommonUnits::Cup);
+        let constraint = ProductConstraint::new(product, Some(3), Some(3), AllowedUnitsType::Cup);
         assert!(constraint.is_some());
         let constraint = constraint.unwrap();
         assert_eq!(constraint.low_bound(), Some(3));

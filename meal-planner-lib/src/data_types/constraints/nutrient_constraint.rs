@@ -2,7 +2,7 @@ use crate::data_types::*;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NutrientType {
-    Macro(MacroElemType),
+    Macro(MacroElementsType),
     Micro(MicroNutrientsType),
 }
 
@@ -14,8 +14,8 @@ pub struct NutrientConstraint {
     max: Option<f32>,
 }
 
-impl From<MacroElemType> for NutrientType {
-    fn from(value: MacroElemType) -> Self {
+impl From<MacroElementsType> for NutrientType {
+    fn from(value: MacroElementsType) -> Self {
         NutrientType::Macro(value)
     }
 }
@@ -79,9 +79,9 @@ mod tests {
     #[test]
     fn test_nutrient_constraint_constructor_macro() {
         let constraint =
-            NutrientConstraint::new(MacroElemType::Protein, Some(10.0), Some(50.0)).unwrap();
+            NutrientConstraint::new(MacroElementsType::Protein, Some(10.0), Some(50.0)).unwrap();
         match constraint.element() {
-            NutrientType::Macro(MacroElemType::Protein) => {}
+            NutrientType::Macro(MacroElementsType::Protein) => {}
             _ => panic!("Expected MacroElemType::Protein"),
         }
         assert_eq!(constraint.min(), Some(10.0));
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn test_nutrient_constraint_no_bounds() {
-        let constraint = NutrientConstraint::new(MacroElemType::Fat, None, None).unwrap();
+        let constraint = NutrientConstraint::new(MacroElementsType::Fat, None, None).unwrap();
         assert_eq!(constraint.min(), None);
         assert_eq!(constraint.max(), None);
     }
@@ -118,7 +118,7 @@ mod tests {
     }
     #[test]
     fn test_nutrient_constraint_negative_min() {
-        let constraint = NutrientConstraint::new(MacroElemType::Carbs, Some(-1.0), Some(10.0));
+        let constraint = NutrientConstraint::new(MacroElementsType::Carbs, Some(-1.0), Some(10.0));
         assert!(
             constraint.is_none(),
             "Constraint should not allow negative min"
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn test_nutrient_constraint_min_greater_than_max() {
-        let constraint = NutrientConstraint::new(MacroElemType::Fat, Some(20.0), Some(10.0));
+        let constraint = NutrientConstraint::new(MacroElementsType::Fat, Some(20.0), Some(10.0));
         assert!(
             constraint.is_none(),
             "Constraint should not allow min > max"
@@ -145,7 +145,7 @@ mod tests {
 
     #[test]
     fn test_nutrient_constraint_min_equal_max() {
-        let constraint = NutrientConstraint::new(MacroElemType::Fat, Some(10.0), Some(10.0));
+        let constraint = NutrientConstraint::new(MacroElementsType::Fat, Some(10.0), Some(10.0));
         assert!(constraint.is_some(), "Constraint should allow min == max");
         let constraint = constraint.unwrap();
         assert_eq!(constraint.min(), Some(10.0));
@@ -167,13 +167,13 @@ mod tests {
     #[test]
     fn test_nutrient_constraint_update_macro() {
         let mut constraint =
-            NutrientConstraint::new(MacroElemType::Protein, Some(10.0), Some(50.0)).unwrap();
+            NutrientConstraint::new(MacroElementsType::Protein, Some(10.0), Some(50.0)).unwrap();
         let new_constraint =
-            NutrientConstraint::new(MacroElemType::Fat, Some(5.0), Some(20.0)).unwrap();
+            NutrientConstraint::new(MacroElementsType::Fat, Some(5.0), Some(20.0)).unwrap();
         constraint.update(new_constraint);
         assert_eq!(
             constraint.element(),
-            NutrientType::Macro(MacroElemType::Fat)
+            NutrientType::Macro(MacroElementsType::Fat)
         );
         assert_eq!(constraint.min(), Some(5.0));
         assert_eq!(constraint.max(), Some(20.0));
@@ -197,8 +197,8 @@ mod tests {
     #[test]
     fn test_nutrient_constraint_update_to_no_bounds() {
         let mut constraint =
-            NutrientConstraint::new(MacroElemType::Carbs, Some(1.0), Some(10.0)).unwrap();
-        let new_constraint = NutrientConstraint::new(MacroElemType::Carbs, None, None).unwrap();
+            NutrientConstraint::new(MacroElementsType::Carbs, Some(1.0), Some(10.0)).unwrap();
+        let new_constraint = NutrientConstraint::new(MacroElementsType::Carbs, None, None).unwrap();
         constraint.update(new_constraint);
         assert_eq!(constraint.min(), None);
         assert_eq!(constraint.max(), None);
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     fn test_nutrient_constraint_update_macro_to_micro() {
         let mut constraint =
-            NutrientConstraint::new(MacroElemType::Fat, Some(2.0), Some(6.0)).unwrap();
+            NutrientConstraint::new(MacroElementsType::Fat, Some(2.0), Some(6.0)).unwrap();
         let new_constraint =
             NutrientConstraint::new(MicroNutrientsType::Zinc, Some(1.0), Some(3.0)).unwrap();
         constraint.update(new_constraint);

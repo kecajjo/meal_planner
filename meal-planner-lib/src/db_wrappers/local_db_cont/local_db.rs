@@ -4,8 +4,8 @@ use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::EnumIter;
 
 use crate::data_types::{
-    AllowedUnits, CommonUnits, MacroElemType, MacroElements, MicroNutrients, MicroNutrientsType,
-    Product,
+    AllowedUnits, AllowedUnitsType, MacroElements, MacroElementsType, MicroNutrients,
+    MicroNutrientsType, Product,
 };
 use crate::db_wrappers::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
 use const_format::concatcp;
@@ -74,8 +74,8 @@ impl LocalProductDb {
                 "FLOAT",
             ),
             SqlTablesNames::AllowedUnits => (
-                CommonUnits::iter()
-                    .map(|x: CommonUnits| x.to_string())
+                AllowedUnitsType::iter()
+                    .map(|x: AllowedUnitsType| x.to_string())
                     .collect::<HashSet<String>>(),
                 "INTEGER",
             ),
@@ -144,14 +144,15 @@ impl LocalProductDb {
             )",
             SqlTablesNames::Products
         );
-        let macro_elem_to_text = |x: MacroElemType| {
-            if MacroElemType::Calories == x {
+        let macro_elem_to_text = |x: MacroElementsType| {
+            if MacroElementsType::Calories == x {
                 "".to_string()
             } else {
                 format!("{} FLOAT NOT NULL,\n", x)
             }
         };
-        let macro_elements_fields: String = MacroElemType::iter().map(macro_elem_to_text).collect();
+        let macro_elements_fields: String =
+            MacroElementsType::iter().map(macro_elem_to_text).collect();
         self.create_table_for_table_name(
             SqlTablesNames::MacroElements.to_string().as_str(),
             table_schema.as_str(),
@@ -176,11 +177,13 @@ impl LocalProductDb {
             .as_str(),
         );
 
-        let allowed_units_to_text = |x: CommonUnits| match x {
-            CommonUnits::Piece => format!("{} INTEGER NOT NULL DEFAULT 1,\n", x),
+        let allowed_units_to_text = |x: AllowedUnitsType| match x {
+            AllowedUnitsType::Piece => format!("{} INTEGER NOT NULL DEFAULT 1,\n", x),
             _ => format!("{} INTEGER,\n", x),
         };
-        let allowed_units_fields: String = CommonUnits::iter().map(allowed_units_to_text).collect();
+        let allowed_units_fields: String = AllowedUnitsType::iter()
+            .map(allowed_units_to_text)
+            .collect();
         self.create_table_for_table_name(
             SqlTablesNames::AllowedUnits.to_string().as_str(),
             table_schema.as_str(),
@@ -232,16 +235,17 @@ enum SelectColumnIndexToProductData {
     Brand = 2,
     MacroElementsStart = 3,
     // -1 because Calories are not to be inside DB
-    MicroNutrientsStart = 3 + MacroElemType::COUNT as isize - 1,
+    MicroNutrientsStart = 3 + MacroElementsType::COUNT as isize - 1,
     // -1 because Calories are not to be inside DB
-    AllowedUnitsStart = 3 + MacroElemType::COUNT as isize + MicroNutrientsType::COUNT as isize - 1,
+    AllowedUnitsStart =
+        3 + MacroElementsType::COUNT as isize + MicroNutrientsType::COUNT as isize - 1,
 }
 
 fn map_query_row_to_product(row: &rusqlite::Row) -> Result<(String, Product), rusqlite::Error> {
     let name = row.get_unwrap(SelectColumnIndexToProductData::Name as usize);
     let brand = row.get_unwrap(SelectColumnIndexToProductData::Brand as usize);
 
-    let mut iter_macroelems = MacroElemType::iter().map(|m| {
+    let mut iter_macroelems = MacroElementsType::iter().map(|m| {
         row.get_unwrap((SelectColumnIndexToProductData::MacroElementsStart as usize) + (m as usize))
     });
     // the last item is Calories, which is computed, so we skip it
@@ -263,11 +267,11 @@ fn map_query_row_to_product(row: &rusqlite::Row) -> Result<(String, Product), ru
         micronutrients[m_type] = value;
     }
 
-    let iter_allowed_units = CommonUnits::iter().map(|u| {
+    let iter_allowed_units = AllowedUnitsType::iter().map(|u| {
         row.get_unwrap((SelectColumnIndexToProductData::AllowedUnitsStart as usize) + (u as usize))
     });
     let mut allowed_units: AllowedUnits = HashMap::new();
-    for (unit, quantity) in CommonUnits::iter().zip(iter_allowed_units) {
+    for (unit, quantity) in AllowedUnitsType::iter().zip(iter_allowed_units) {
         if let Some(qty) = quantity {
             allowed_units.insert(unit, qty);
         }
@@ -306,8 +310,8 @@ impl DbWrapper for LocalProductDb {
 
         append_columns(
             SqlTablesNames::MacroElements,
-            &mut MacroElemType::iter().map(|m| {
-                if m == MacroElemType::Calories {
+            &mut MacroElementsType::iter().map(|m| {
+                if m == MacroElementsType::Calories {
                     None
                 } else {
                     Some(m.to_string())
@@ -320,7 +324,7 @@ impl DbWrapper for LocalProductDb {
         );
         append_columns(
             SqlTablesNames::AllowedUnits,
-            &mut CommonUnits::iter().map(|m| Some(m.to_string())),
+            &mut AllowedUnitsType::iter().map(|m| Some(m.to_string())),
         );
 
         query_template.push_str(&format!(
@@ -359,7 +363,7 @@ impl DbWrapper for LocalProductDb {
     fn set_product_unit(
         &mut self,
         product_id: &str,
-        allowed_unit: CommonUnits,
+        allowed_unit: AllowedUnitsType,
         quantity: u16,
     ) -> Result<(), String> {
         let update_query = format!(
@@ -381,87 +385,120 @@ impl DbWrapper for LocalProductDb {
     }
 }
 
-macro_rules! add_product_macro_micro_units {}
-
 impl MutableDbWrapper for LocalProductDb {
     fn add_product(&mut self, product: Product) -> Result<(), String> {
         let query_template = "INSERT INTO ?1 (?2) VALUES (?3);";
-        let run_query = |table_name, columns_str, values_str| {
-            self.sqlite_con
-                .execute(query_template, [table_name, columns_str, values_str])
-                .map_err(|e| {
-                    format!(
-                        "Failed to insert product '{}' into {} table: {}",
-                        &self.get_product_id(&product),
-                        table_name,
-                        e
-                    )
-                })?;
-            Ok(())
-        };
+        let product_id = self.get_product_id(&product);
+        let run_query =
+            |table_name: &str, columns_str: &str, values_str: &str| -> Result<(), String> {
+                self.sqlite_con
+                    .execute(query_template, [table_name, columns_str, values_str])
+                    .map_err(|e| {
+                        format!(
+                            "Failed to insert product '{}' into {} table: {}",
+                            product_id, table_name, e
+                        )
+                    })?;
+                Ok(())
+            };
         run_query(
             SqlTablesNames::Products.to_string().as_str(),
             "id, name, brand",
             format!(
                 "{}, {}, {}",
-                self.get_product_id(&product),
-                &product.name(),
-                &product.brand().unwrap_or("NULL")
+                product_id,
+                product.name(),
+                product.brand().unwrap_or("NULL")
             )
             .as_str(),
         )?;
 
-        let macro_elems_col_names = MacroElemType::iter()
-            .filter_map(|x| match x {
-                MacroElemType::Calories => None,
-                _ => Some(format!("{}, ", x)),
-            })
-            .collect::<String>()
-            .strip_suffix(", ")
-            .unwrap();
+        macro_rules! map_function_for_add {
+            ($it:expr, MacroElements, columns) => {
+                $it.filter_map(|x| match x {
+                    MacroElementsType::Calories => None,
+                    _ => Some(format!("{}, ", x)),
+                })
+            };
+            ($it:expr, MicroNutrients, columns) => {
+                $it.map(|x| format!("{}, ", x))
+            };
+            ($it:expr, AllowedUnits, columns) => {
+                $it.map(|x| format!("{}, ", x))
+            };
+            ($it:expr, MacroElements, values) => {
+                $it.filter_map(|x| match x {
+                    MacroElementsType::Calories => None,
+                    _ => Some(format!("{}, ", product.macro_elements[x])),
+                })
+            };
+            ($it:expr, MicroNutrients, values) => {
+                $it.map(|x| {
+                    let val = product.micro_nutrients[x];
+                    if val.is_none() {
+                        "NULL, ".to_string()
+                    } else {
+                        format!("{}, ", val.unwrap())
+                    }
+                })
+            };
+            ($it:expr, AllowedUnits, values) => {
+                $it.map(|x| {
+                    let val = product.allowed_units.get(&x);
+                    if val.is_none() {
+                        "NULL, ".to_string()
+                    } else {
+                        format!("{}, ", val.unwrap())
+                    }
+                })
+            };
+        }
 
-        let macro_elems_values = MacroElemType::iter()
-            .filter_map(|x| match x {
-                MacroElemType::Calories => None,
-                _ => Some(format!("{}, ", product.macro_elements[x])),
-            })
-            .collect::<String>()
-            .strip_suffix(", ")
-            .unwrap();
+        macro_rules! add_product_macro_micro_units {
+            ($object:tt, $enum_type:ty, $sql_table_var:expr) => {
+                let col_names_iter = <$enum_type>::iter();
 
-        run_query(
-            SqlTablesNames::MacroElements.to_string().as_str(),
-            format!("id, {}", macro_elems_col_names).as_str(),
-            format!("{}, {}", self.get_product_id(&product), macro_elems_values).as_str(),
-        )?;
+                let col_names = map_function_for_add!(col_names_iter, $object, columns)
+                    .collect::<String>()
+                    .strip_suffix(", ")
+                    .unwrap()
+                    .to_string();
 
-        let micronutrients_col_names = MicroNutrientsType::iter()
-            .map(|x| format!("{}, ", x))
-            .collect::<String>()
-            .strip_suffix(", ")
-            .unwrap();
-        let micronutrients_values = MicroNutrientsType::iter()
-            .map(|x| {
-                let val = product.micro_nutrients[x];
-                if val.is_none() {
-                    "NULL, ".to_string()
-                } else {
-                    format!("{}, ", val.unwrap())
-                }
-            })
-            .collect::<String>()
-            .strip_suffix(", ")
-            .unwrap();
-        run_query(
-            SqlTablesNames::MicroNutrients.to_string().as_str(),
-            format!("id, {}", micronutrients_col_names).as_str(),
-            format!(
-                "{}, {}",
-                self.get_product_id(&product),
-                micronutrients_values
-            )
-            .as_str(),
-        )?;
+                let values_iter = <$enum_type>::iter();
+
+                let values = map_function_for_add!(values_iter, $object, values)
+                    .collect::<String>()
+                    .strip_suffix(", ")
+                    .unwrap()
+                    .to_string();
+
+                run_query(
+                    $sql_table_var.to_string().as_str(),
+                    format!("id, {}", col_names).as_str(),
+                    format!("{}, {}", self.get_product_id(&product), values).as_str(),
+                )?;
+            };
+        }
+
+        add_product_macro_micro_units!(
+            MacroElements,
+            MacroElementsType,
+            SqlTablesNames::MacroElements
+        );
+
+        add_product_macro_micro_units!(
+            MicroNutrients,
+            MicroNutrientsType,
+            SqlTablesNames::MicroNutrients
+        );
+
+        add_product_macro_micro_units!(
+            AllowedUnits,
+            AllowedUnitsType,
+            SqlTablesNames::AllowedUnits
+        );
+
+        Ok(())
     }
 
     fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {

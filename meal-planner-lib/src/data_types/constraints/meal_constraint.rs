@@ -11,7 +11,7 @@ mod tests {
 
     use super::super::*;
     use super::*;
-    use crate::data_types::{CommonUnits, MacroElemType, MacroElements, MicroNutrients, Product};
+    use crate::data_types::{AllowedUnitsType, MacroElementsType, MacroElements, MicroNutrients, Product};
 
     fn initialize_meal_with_products() -> MealConstraint {
         let mut macro_elements_vec = vec![
@@ -27,14 +27,14 @@ mod tests {
             Box::new(MicroNutrients::default()),
         ];
         let mut grams1 = std::collections::HashMap::new();
-        grams1.insert(CommonUnits::Cup, 200);
-        grams1.insert(CommonUnits::Piece, 150);
+        grams1.insert(AllowedUnitsType::Cup, 200);
+        grams1.insert(AllowedUnitsType::Piece, 150);
         let mut grams2 = std::collections::HashMap::new();
-        grams2.insert(CommonUnits::Tablespoon, 10);
+        grams2.insert(AllowedUnitsType::Tablespoon, 10);
         let mut grams3 = std::collections::HashMap::new();
-        grams3.insert(CommonUnits::Piece, 100);
+        grams3.insert(AllowedUnitsType::Piece, 100);
         let mut grams4 = std::collections::HashMap::new();
-        grams4.insert(CommonUnits::Piece, 50);
+        grams4.insert(AllowedUnitsType::Piece, 50);
         let prod1 = Box::new(Product::new(
             "Apple".to_string(),
             None,
@@ -64,10 +64,10 @@ mod tests {
             grams4,
         ));
 
-        let pc1 = ProductConstraint::new(prod1, Some(1), Some(2), CommonUnits::Cup);
-        let pc2 = ProductConstraint::new(prod2, Some(2), Some(3), CommonUnits::Tablespoon);
-        let pc3 = ProductConstraint::new(prod3, Some(3), Some(4), CommonUnits::Custom);
-        let pc4 = ProductConstraint::new(prod4, Some(3), Some(4), CommonUnits::Piece);
+        let pc1 = ProductConstraint::new(prod1, Some(1), Some(2), AllowedUnitsType::Cup);
+        let pc2 = ProductConstraint::new(prod2, Some(2), Some(3), AllowedUnitsType::Tablespoon);
+        let pc3 = ProductConstraint::new(prod3, Some(3), Some(4), AllowedUnitsType::Custom);
+        let pc4 = ProductConstraint::new(prod4, Some(3), Some(4), AllowedUnitsType::Piece);
         let mut products = Vec::new();
         products.push(pc1.unwrap());
         products.push(pc2.unwrap());
@@ -76,10 +76,10 @@ mod tests {
 
         let mut nutrients = Vec::new();
         nutrients
-            .push(NutrientConstraint::new(MacroElemType::Protein, Some(10.0), Some(20.0)).unwrap());
-        nutrients.push(NutrientConstraint::new(MacroElemType::Fat, Some(5.0), Some(15.0)).unwrap());
+            .push(NutrientConstraint::new(MacroElementsType::Protein, Some(10.0), Some(20.0)).unwrap());
+        nutrients.push(NutrientConstraint::new(MacroElementsType::Fat, Some(5.0), Some(15.0)).unwrap());
         nutrients
-            .push(NutrientConstraint::new(MacroElemType::Carbs, Some(30.0), Some(60.0)).unwrap());
+            .push(NutrientConstraint::new(MacroElementsType::Carbs, Some(30.0), Some(60.0)).unwrap());
 
         MealConstraint {
             products: products,
@@ -101,10 +101,10 @@ mod tests {
         let mut meal = initialize_meal_with_products();
         // Remove from middle (second nutrient)
         let removed = meal.nutrients.remove(1);
-        assert_eq!(removed.element(), NutrientType::Macro(MacroElemType::Fat));
+        assert_eq!(removed.element(), NutrientType::Macro(MacroElementsType::Fat));
         assert_eq!(
             meal.nutrients[1].element(),
-            NutrientType::Macro(MacroElemType::Carbs)
+            NutrientType::Macro(MacroElementsType::Carbs)
         );
     }
 

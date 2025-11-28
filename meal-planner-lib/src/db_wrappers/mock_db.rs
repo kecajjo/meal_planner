@@ -46,35 +46,35 @@ impl MockProductDb {
         let mut allowed_units = vec![
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::CommonUnits::Piece, 150);
-                map.insert(crate::data_types::CommonUnits::Box, 50);
+                map.insert(crate::data_types::AllowedUnitsType::Piece, 150);
+                map.insert(crate::data_types::AllowedUnitsType::Box, 50);
                 map
             },
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::CommonUnits::Cup, 250);
-                map.insert(crate::data_types::CommonUnits::Teaspoon, 5);
-                map.insert(crate::data_types::CommonUnits::Tablespoon, 5);
+                map.insert(crate::data_types::AllowedUnitsType::Cup, 250);
+                map.insert(crate::data_types::AllowedUnitsType::Teaspoon, 5);
+                map.insert(crate::data_types::AllowedUnitsType::Tablespoon, 5);
                 map
             },
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::CommonUnits::Cup, 250);
+                map.insert(crate::data_types::AllowedUnitsType::Cup, 250);
                 map
             },
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::CommonUnits::Teaspoon, 1);
+                map.insert(crate::data_types::AllowedUnitsType::Teaspoon, 1);
                 map
             },
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::CommonUnits::Box, 50);
+                map.insert(crate::data_types::AllowedUnitsType::Box, 50);
                 map
             },
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::CommonUnits::Piece, 1);
+                map.insert(crate::data_types::AllowedUnitsType::Piece, 1);
                 map
             },
         ];
@@ -170,7 +170,7 @@ impl DbWrapper for MockProductDb {
     fn set_product_unit(
         &mut self,
         product_id: &str,
-        allowed_unit: crate::data_types::CommonUnits,
+        allowed_unit: crate::data_types::AllowedUnitsType,
         quantity: u16,
     ) -> Result<(), String> {
         let product = self
@@ -212,7 +212,7 @@ mod tests {
             Box::new(MicroNutrients::default()),
             {
                 let mut map = std::collections::HashMap::new();
-                map.insert(crate::data_types::CommonUnits::Piece, 1);
+                map.insert(crate::data_types::AllowedUnitsType::Piece, 1);
                 map
             },
         );
@@ -236,23 +236,26 @@ mod tests {
                 .is_ok()
         );
         let updated = &db.products[key].macro_elements;
-        use crate::data_types::MacroElemType;
-        assert_eq!(updated[MacroElemType::Fat], new_macros[MacroElemType::Fat]);
+        use crate::data_types::MacroElementsType;
         assert_eq!(
-            updated[MacroElemType::SaturatedFat],
-            new_macros[MacroElemType::SaturatedFat]
+            updated[MacroElementsType::Fat],
+            new_macros[MacroElementsType::Fat]
         );
         assert_eq!(
-            updated[MacroElemType::Carbs],
-            new_macros[MacroElemType::Carbs]
+            updated[MacroElementsType::SaturatedFat],
+            new_macros[MacroElementsType::SaturatedFat]
         );
         assert_eq!(
-            updated[MacroElemType::Sugar],
-            new_macros[MacroElemType::Sugar]
+            updated[MacroElementsType::Carbs],
+            new_macros[MacroElementsType::Carbs]
         );
         assert_eq!(
-            updated[MacroElemType::Protein],
-            new_macros[MacroElemType::Protein]
+            updated[MacroElementsType::Sugar],
+            new_macros[MacroElementsType::Sugar]
+        );
+        assert_eq!(
+            updated[MacroElementsType::Protein],
+            new_macros[MacroElementsType::Protein]
         );
     }
 
@@ -270,7 +273,7 @@ mod tests {
     fn test_set_product_unit_success() {
         let mut db = MockProductDb::new();
         let product_id = "Apple (BrandedApple)";
-        let unit = crate::data_types::CommonUnits::Cup;
+        let unit = crate::data_types::AllowedUnitsType::Cup;
         let quantity = 123;
         let result = db.set_product_unit(product_id, unit, quantity);
         assert!(result.is_ok());
@@ -282,7 +285,7 @@ mod tests {
     fn test_set_product_unit_error() {
         let mut db = MockProductDb::new();
         let product_id = "NonExistentProduct";
-        let unit = crate::data_types::CommonUnits::Cup;
+        let unit = crate::data_types::AllowedUnitsType::Cup;
         let quantity = 123;
         let result = db.set_product_unit(product_id, unit, quantity);
         assert!(result.is_err());
