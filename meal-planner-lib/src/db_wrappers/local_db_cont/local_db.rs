@@ -49,12 +49,12 @@ impl LocalProductDb {
             rusqlite::Connection::open(database_file).expect("Failed to open SQLite database");
         con.execute("PRAGMA foreign_keys = ON;", [])
             .expect("Failed to enable foreign keys");
+        Self::init_db_if_new_created(&con);
         Some(LocalProductDb { sqlite_con: con })
     }
 
-    fn init_db_if_new_created(&self) {
-        let mut stmt = self
-            .sqlite_con
+    fn init_db_if_new_created(sqlite_con: &rusqlite::Connection) {
+        let mut stmt = sqlite_con
             .prepare(&format!(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name={};",
                 SqlTablesNames::Products
@@ -62,7 +62,7 @@ impl LocalProductDb {
             .expect("Failed to prepare statement");
         let mut rows = stmt.query([]).expect("Failed to execute query");
         if rows.next().expect("Failed to fetch row").is_none() {
-            self.create_tables();
+            Self::create_tables(sqlite_con);
         }
     }
 
@@ -125,8 +125,8 @@ impl LocalProductDb {
         Ok(())
     }
 
-    fn create_tables(&self) {
-        self.sqlite_con
+    fn create_tables(sqlite_con: &rusqlite::Connection) {
+        sqlite_con
             .execute(
                 format!(
                     "CREATE TABLE {} (
@@ -158,7 +158,8 @@ impl LocalProductDb {
         };
         let macro_elements_fields: String =
             MacroElementsType::iter().map(macro_elem_to_text).collect();
-        self.create_table_for_table_name(
+        Self::create_table_for_table_name(
+            sqlite_con,
             SqlTablesNames::MacroElements.to_string().as_str(),
             table_schema.as_str(),
             macro_elements_fields.as_str(),
@@ -169,7 +170,8 @@ impl LocalProductDb {
         let micronutrients_fields: String = MicroNutrientsType::iter()
             .map(micronutrients_to_text)
             .collect();
-        self.create_table_for_table_name(
+        Self::create_table_for_table_name(
+            sqlite_con,
             SqlTablesNames::MicroNutrients.to_string().as_str(),
             table_schema.as_str(),
             micronutrients_fields.as_str(),
@@ -189,7 +191,8 @@ impl LocalProductDb {
         let allowed_units_fields: String = AllowedUnitsType::iter()
             .map(allowed_units_to_text)
             .collect();
-        self.create_table_for_table_name(
+        Self::create_table_for_table_name(
+            sqlite_con,
             SqlTablesNames::AllowedUnits.to_string().as_str(),
             table_schema.as_str(),
             allowed_units_fields.as_str(),
@@ -198,12 +201,12 @@ impl LocalProductDb {
     }
 
     fn create_table_for_table_name(
-        &self,
+        sqlite_con: &rusqlite::Connection,
         table_name: &str,
         table_schema: &str,
         data: &str,
     ) -> Result<(), String> {
-        self.sqlite_con
+        sqlite_con
             .execute(table_schema, [table_name, data])
             .map_err(|e| format!("Failed to create '{}' table: {}", table_name, e))?;
         Ok(())
@@ -619,23 +622,145 @@ mod tests {
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicUsize, Ordering};
+    #[allow(unused_imports)]
+    use strum::IntoEnumIterator;
+
+    fn assert_table_columns(connection: &Connection, table: &str, expected_columns: &[String]) {
+        let count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1;",
+                [table],
+                |row| row.get(0),
+            )
+            .expect("Failed to check table existence");
+        assert!(count > 0, "Expected '{}' table to exist", table);
+
+        let mut stmt = connection
+            .prepare(&format!("SELECT name FROM pragma_table_info('{}');", table))
+            .expect("Failed to prepare pragma_table_info statement");
+        let columns: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .expect("Failed to read table columns")
+            .map(|res| res.expect("Failed to extract column name"))
+            .collect();
+
+        assert_eq!(
+            columns, expected_columns,
+            "Unexpected columns for table '{}'",
+            table
+        );
+    }
+
+    #[test]
+    fn test_00_0_local_product_db_new_creates_schema() {
+        let db_path = unique_test_db_path();
+        let _cleanup_guard = FileCleanup::new(db_path.clone());
+        cleanup_existing_files(&db_path).expect("Failed to clean up test database files");
+        assert!(
+            !db_path.exists(),
+            "Expected database file to be absent before initialization"
+        );
+
+        if let Some(parent) = db_path.parent() {
+            fs::create_dir_all(parent).expect("Failed to create database directory");
+        }
+
+        let path_str = db_path
+            .to_str()
+            .expect("Database path contains invalid UTF-8");
+
+        {
+            let _db = LocalProductDb::new(path_str)
+                .expect("Expected LocalProductDb::new to succeed for fresh database");
+        }
+
+        assert!(db_path.exists(), "Expected SQLite file to be created");
+
+        let connection = Connection::open(&db_path).expect("Failed to open created database");
+
+        let mut macro_columns = vec!["id".to_string()];
+        macro_columns.extend(
+            MacroElementsType::iter()
+                .filter(|m| *m != MacroElementsType::Calories)
+                .map(|m| m.to_string()),
+        );
+
+        let mut micro_columns = vec!["id".to_string()];
+        micro_columns.extend(MicroNutrientsType::iter().map(|m| m.to_string()));
+
+        let mut allowed_columns = vec!["id".to_string()];
+        allowed_columns.extend(AllowedUnitsType::iter().map(|u| u.to_string()));
+
+        let product_columns = vec!["id".to_string(), "name".to_string(), "brand".to_string()];
+        assert_table_columns(&connection, "products", &product_columns);
+        assert_table_columns(&connection, "macro_elements", &macro_columns);
+        assert_table_columns(&connection, "micronutrients", &micro_columns);
+        assert_table_columns(&connection, "allowed_units", &allowed_columns);
+
+        drop(connection);
+    }
+
+    #[test]
+    fn test_00_1_local_product_db_new_preserves_existing_data() {
+        let test_db = TestDbGuard::create_empty().expect("Failed to create empty database");
+
+        {
+            let mut db = test_db.local_db();
+            let mut allowed_units: AllowedUnits = HashMap::new();
+            allowed_units.insert(AllowedUnitsType::Piece, 1);
+            let product = Product::new(
+                "Persisted".to_string(),
+                Some("BrandP".to_string()),
+                Box::new(MacroElements::new(
+                    1.0_f32, 0.5_f32, 2.0_f32, 1.0_f32, 3.0_f32,
+                )),
+                Box::new(MicroNutrients::default()),
+                allowed_units,
+            );
+
+            let product_id = db.get_product_default_id(&product);
+            db.add_product(product_id.as_str(), product)
+                .expect("Expected add_product to succeed for persisted product");
+        }
+
+        let db = test_db.local_db();
+        let results =
+            db.get_products_matching_criteria(&[DbSearchCriteria::ByName("Persisted".to_string())]);
+        let key = "Persisted (BrandP)";
+        assert!(
+            results.contains_key(key),
+            "Expected previously inserted product '{}' to remain after reopening",
+            key
+        );
+    }
 
     struct TestDbGuard {
         path: PathBuf,
     }
 
     impl TestDbGuard {
-        fn create_seeded() -> Result<Self, String> {
+        fn create_empty() -> Result<Self, String> {
             let path = unique_test_db_path();
             cleanup_existing_files(&path)?;
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
-            let connection = Connection::open(&path).map_err(|e| e.to_string())?;
-            initialize_schema(&connection).map_err(|e| e.to_string())?;
-            seed_products(&connection).map_err(|e| e.to_string())?;
-            drop(connection);
+            let path_str = path
+                .to_str()
+                .ok_or_else(|| "Database path contains invalid UTF-8".to_string())?;
+            let db = LocalProductDb::new(path_str)
+                .ok_or_else(|| "LocalProductDb::new returned None".to_string())?;
+            drop(db);
             Ok(Self { path })
+        }
+
+        fn create_seeded() -> Result<Self, String> {
+            let guard = Self::create_empty()?;
+            {
+                let mut db = guard.local_db();
+                seed_products(&mut db)?;
+            }
+            Ok(guard)
         }
 
         fn connection(&self) -> Connection {
@@ -701,144 +826,68 @@ mod tests {
         }
     }
 
-    fn initialize_schema(connection: &Connection) -> rusqlite::Result<()> {
-        connection.execute("PRAGMA foreign_keys = ON;", [])?;
-        connection.execute(
-            "CREATE TABLE products (
-                id TEXT NOT NULL PRIMARY KEY,
-                name CHAR NOT NULL,
-                brand CHAR
-            );",
-            [],
-        )?;
-        connection.execute(
-            "CREATE TABLE macro_elements (
-                id TEXT NOT NULL PRIMARY KEY,
-                \"Fat\" FLOAT NOT NULL,
-                \"Saturated Fat\" FLOAT NOT NULL,
-                \"Carbohydrates\" FLOAT NOT NULL,
-                \"Sugar\" FLOAT NOT NULL,
-                \"Protein\" FLOAT NOT NULL,
-                FOREIGN KEY(id) REFERENCES products(id)
-            );",
-            [],
-        )?;
-        connection.execute(
-            "CREATE TABLE micronutrients (
-                id TEXT NOT NULL PRIMARY KEY,
-                Fiber FLOAT,
-                Zinc FLOAT,
-                Sodium FLOAT,
-                Alcohol FLOAT,
-                FOREIGN KEY(id) REFERENCES products(id)
-            );",
-            [],
-        )?;
-        connection.execute(
-            "CREATE TABLE allowed_units (
-                id TEXT NOT NULL PRIMARY KEY,
-                piece INTEGER NOT NULL DEFAULT 1,
-                cup INTEGER,
-                tablespoon INTEGER,
-                teaspoon INTEGER,
-                box INTEGER,
-                custom INTEGER,
-                FOREIGN KEY(id) REFERENCES products(id)
-            );",
-            [],
-        )?;
+    fn seed_products(db: &mut LocalProductDb) -> Result<(), String> {
+        let mut apple_allowed: AllowedUnits = HashMap::new();
+        apple_allowed.insert(AllowedUnitsType::Piece, 1);
+        apple_allowed.insert(AllowedUnitsType::Cup, 1);
+        let mut apple_micro = Box::new(MicroNutrients::default());
+        apple_micro[MicroNutrientsType::Fiber] = Some(2.4_f32);
+        apple_micro[MicroNutrientsType::Zinc] = Some(0.1_f32);
+        apple_micro[MicroNutrientsType::Sodium] = Some(1.0_f32);
+        let apple = Product::new(
+            "Apple".to_string(),
+            Some("BrandA".to_string()),
+            Box::new(MacroElements::new(
+                0.2_f32, 0.1_f32, 14.0_f32, 10.0_f32, 0.3_f32,
+            )),
+            apple_micro,
+            apple_allowed,
+        );
+        let apple_id = db.get_product_default_id(&apple);
+        db.add_product(apple_id.as_str(), apple)
+            .map_err(|e| format!("Failed to seed product {}: {}", apple_id, e))?;
+
+        let mut banana_allowed: AllowedUnits = HashMap::new();
+        banana_allowed.insert(AllowedUnitsType::Piece, 1);
+        banana_allowed.insert(AllowedUnitsType::Tablespoon, 2);
+        banana_allowed.insert(AllowedUnitsType::Custom, 50);
+        let mut banana_micro = Box::new(MicroNutrients::default());
+        banana_micro[MicroNutrientsType::Fiber] = Some(2.6_f32);
+        banana_micro[MicroNutrientsType::Sodium] = Some(1.0_f32);
+        let banana = Product::new(
+            "Banana".to_string(),
+            None,
+            Box::new(MacroElements::new(
+                0.3_f32, 0.1_f32, 23.0_f32, 12.0_f32, 1.1_f32,
+            )),
+            banana_micro,
+            banana_allowed,
+        );
+        let banana_id = db.get_product_default_id(&banana);
+        db.add_product(banana_id.as_str(), banana)
+            .map_err(|e| format!("Failed to seed product {}: {}", banana_id, e))?;
+
         Ok(())
     }
 
-    fn seed_products(connection: &Connection) -> rusqlite::Result<()> {
-        let seeds = vec![
-            SeedProduct {
-                id: "Apple (BrandA)",
-                name: "Apple",
-                brand: Some("BrandA"),
-                macro_elements: (0.2_f32, 0.1_f32, 14.0_f32, 10.0_f32, 0.3_f32),
-                micro_nutrients: [Some(2.4_f32), Some(0.1_f32), Some(1.0_f32), None],
-                allowed_units: [Some(1), Some(1), None, None, None, None],
-            },
-            SeedProduct {
-                id: "Banana",
-                name: "Banana",
-                brand: None,
-                macro_elements: (0.3_f32, 0.1_f32, 23.0_f32, 12.0_f32, 1.1_f32),
-                micro_nutrients: [Some(2.6_f32), None, Some(1.0_f32), None],
-                allowed_units: [Some(1), None, Some(2), None, None, Some(50)],
-            },
-        ];
+    struct FileCleanup {
+        path: PathBuf,
+    }
 
-        for product in seeds {
-            connection.execute(
-                "INSERT INTO products (id, name, brand) VALUES (?1, ?2, ?3);",
-                params![product.id, product.name, product.brand],
-            )?;
-            connection.execute(
-                "INSERT INTO macro_elements (
-                    id,
-                    \"Fat\",
-                    \"Saturated Fat\",
-                    \"Carbohydrates\",
-                    \"Sugar\",
-                    \"Protein\"
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6);",
-                params![
-                    product.id,
-                    product.macro_elements.0,
-                    product.macro_elements.1,
-                    product.macro_elements.2,
-                    product.macro_elements.3,
-                    product.macro_elements.4,
-                ],
-            )?;
-            connection.execute(
-                "INSERT INTO micronutrients (id, Fiber, Zinc, Sodium, Alcohol)
-                 VALUES (?1, ?2, ?3, ?4, ?5);",
-                params![
-                    product.id,
-                    product.micro_nutrients[0],
-                    product.micro_nutrients[1],
-                    product.micro_nutrients[2],
-                    product.micro_nutrients[3],
-                ],
-            )?;
-            connection.execute(
-                "INSERT INTO allowed_units (
-                    id,
-                    piece,
-                    cup,
-                    tablespoon,
-                    teaspoon,
-                    box,
-                    custom
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);",
-                params![
-                    product.id,
-                    product.allowed_units[0],
-                    product.allowed_units[1],
-                    product.allowed_units[2],
-                    product.allowed_units[3],
-                    product.allowed_units[4],
-                    product.allowed_units[5],
-                ],
-            )?;
+    impl FileCleanup {
+        fn new(path: PathBuf) -> Self {
+            Self { path }
         }
-        Ok(())
     }
 
-    struct SeedProduct {
-        id: &'static str,
-        name: &'static str,
-        brand: Option<&'static str>,
-        macro_elements: (f32, f32, f32, f32, f32),
-        micro_nutrients: [Option<f32>; MicroNutrientsType::COUNT],
-        allowed_units: [Option<u16>; AllowedUnitsType::COUNT],
+    impl Drop for FileCleanup {
+        fn drop(&mut self) {
+            let _ = cleanup_existing_files(&self.path);
+        }
     }
 
     #[test]
-    fn test_00_initialize_and_seed_database() {
+    fn test_01_initialize_and_seed_database() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let conn = test_db.connection();
         let product_count: i64 = conn
@@ -856,7 +905,7 @@ mod tests {
     }
 
     #[test]
-    fn test_01_get_products_matching_criteria_returns_expected_product() {
+    fn test_02_get_products_matching_criteria_returns_expected_product() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let db = test_db.local_db();
         let results =
@@ -880,7 +929,7 @@ mod tests {
     }
 
     #[test]
-    fn test_02_set_product_unit_updates_allowed_units_table() {
+    fn test_03_set_product_unit_updates_allowed_units_table() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         let result = db.set_product_unit("Apple (BrandA)", AllowedUnitsType::Cup, 3);
@@ -897,7 +946,7 @@ mod tests {
     }
 
     #[test]
-    fn test_03_add_product_inserts_all_related_rows() {
+    fn test_04_add_product_inserts_all_related_rows() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         let mut allowed_units: AllowedUnits = HashMap::new();
@@ -929,7 +978,7 @@ mod tests {
     }
 
     #[test]
-    fn test_04_update_product_modifies_macro_and_micro_values() {
+    fn test_05_update_product_modifies_macro_and_micro_values() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         let mut allowed_units: AllowedUnits = HashMap::new();
@@ -963,7 +1012,7 @@ mod tests {
     }
 
     #[test]
-    fn test_05_delete_product_removes_all_rows() {
+    fn test_06_delete_product_removes_all_rows() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         assert!(
@@ -982,7 +1031,7 @@ mod tests {
     }
 
     #[test]
-    fn test_06_new_returns_connection() {
+    fn test_07_new_returns_connection() {
         let db_path = unique_test_db_path();
         cleanup_existing_files(&db_path).expect("Failed to remove pre-existing database file");
         if let Some(parent) = db_path.parent() {
