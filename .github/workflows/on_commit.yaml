@@ -1,0 +1,26 @@
+name: Build pr
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    container:
+      image: jacekmultan/meal-planner-rust:0.1
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --workspace --all-targets --verbose
+      - name: Test
+        run: cargo test --workspace --all-targets --verbose

@@ -1,10 +1,12 @@
 #!/bin/bash
 scriptDir=$(dirname $0 | xargs -i readlink -f {})
+docker_registry_path="jacekmultan"
 container_name="meal_planner"
+image_name=${docker_registry_path}/${container_name}
 version="0.1"
-does_exist=$(docker image ls $container_name:$version | grep -ci1 $container_name)
+does_exist=$(docker image ls $image_name:$version | grep -ci1 $container_name)
 if [ $does_exist == "0" ] ; then
-	docker build -t $container_name:$version $scriptDir/
+	docker build -t $image_name:$version $scriptDir/
 fi
 docker run --rm \
     --privileged \
@@ -14,4 +16,4 @@ docker run --rm \
     -v $HOME/.Xauthority:/root/.Xauthority \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v "$scriptDir:/home/developer/repo" \
-    -it $container_name:$version /bin/bash
+    -it $image_name:$version /bin/bash
