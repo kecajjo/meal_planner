@@ -23,7 +23,9 @@ pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn DbWrapper>> {
     match db_type {
         #[cfg(test)]
         DataBaseTypes::MockDb => Some(Box::new(mock_db::MockProductDb::new())),
-        DataBaseTypes::LocalDb => Some(Box::new(local_db::LocalProductDb::new()?)),
+        DataBaseTypes::LocalDb => Some(Box::new(local_db::LocalProductDb::new(
+            local_db::DATABASE_FILENAME,
+        )?)),
         _ => panic!("Database type not supported in this build."),
         // DataBaseTypes::OpenFoodFactsDb => {
         //     Box::new(open_food_facts_wrapper::OpenFoodFactsDbWrapper::new())

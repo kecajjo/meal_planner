@@ -14,9 +14,9 @@ use rusqlite;
 // cant make paths relative to this file
 const DATABASE_PATH: &str = "src/db_wrappers/local_db_cont/";
 #[cfg(not(test))]
-const DATABASE_FILENAME: &str = concatcp!(DATABASE_PATH, "local_db.sqlite");
+pub(crate) const DATABASE_FILENAME: &str = concatcp!(DATABASE_PATH, "local_db.sqlite");
 #[cfg(test)]
-const DATABASE_FILENAME: &str = concatcp!(DATABASE_PATH, "test_local_db.sqlite");
+pub(crate) const DATABASE_FILENAME: &str = concatcp!(DATABASE_PATH, "test_local_db.sqlite");
 
 pub(crate) struct LocalProductDb {
     sqlite_con: rusqlite::Connection,
@@ -44,9 +44,9 @@ impl fmt::Display for SqlTablesNames {
 
 // TODO panicking to be replaced with proper error handling
 impl LocalProductDb {
-    pub fn new() -> Option<Self> {
+    pub fn new(database_file: &str) -> Option<Self> {
         let con =
-            rusqlite::Connection::open(DATABASE_FILENAME).expect("Failed to open SQLite database");
+            rusqlite::Connection::open(database_file).expect("Failed to open SQLite database");
         con.execute("PRAGMA foreign_keys = ON;", [])
             .expect("Failed to enable foreign keys");
         Some(LocalProductDb { sqlite_con: con })
@@ -599,8 +599,9 @@ mod tests {
     use crate::db_wrappers::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
     use rusqlite::{Connection, params};
     use std::collections::HashMap;
-    use std::fs; 
+    use std::fs;
     use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct TestDbGuard {
         path: PathBuf,
@@ -608,7 +609,7 @@ mod tests {
 
     impl TestDbGuard {
         fn create_seeded() -> Result<Self, String> {
-            let path = PathBuf::from(DATABASE_FILENAME);
+            let path = unique_test_db_path();
             cleanup_existing_files(&path)?;
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -625,10 +626,12 @@ mod tests {
         }
 
         fn local_db(&self) -> LocalProductDb {
-            let connection = self.connection();
-            LocalProductDb {
-                sqlite_con: connection,
-            }
+            LocalProductDb::new(
+                self.path
+                    .to_str()
+                    .expect("Database path contains invalid UTF-8"),
+            )
+            .expect("Failed to reopen seeded LocalProductDb")
         }
     }
 
@@ -639,10 +642,46 @@ mod tests {
     }
 
     fn cleanup_existing_files(path: &Path) -> Result<(), String> {
-        if path.exists() {
-            std::fs::remove_file(path).map_err(|e| e.to_string())?;
+        use std::io::ErrorKind;
+
+        let attempt_remove = |candidate: &Path| -> Result<(), String> {
+            match fs::remove_file(candidate) {
+                Ok(_) => Ok(()),
+                Err(err) if err.kind() == ErrorKind::NotFound => Ok(()),
+                Err(err) => Err(err.to_string()),
+            }
+        };
+
+        attempt_remove(path)?;
+        for suffix in ["-journal", "-wal", "-shm"] {
+            let mut os_string = path.as_os_str().to_os_string();
+            os_string.push(suffix);
+            let candidate: PathBuf = os_string.into();
+            attempt_remove(&candidate)?;
         }
         Ok(())
+    }
+
+    fn unique_test_db_path() -> PathBuf {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let suffix = COUNTER.fetch_add(1, Ordering::Relaxed);
+
+        let base_path = Path::new(DATABASE_FILENAME);
+        let parent = base_path.parent();
+        let stem = base_path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "test_db".to_string());
+        let filename = if let Some(ext) = base_path.extension() {
+            format!("{}_{}.{}", stem, suffix, ext.to_string_lossy())
+        } else {
+            format!("{}_{}", stem, suffix)
+        };
+
+        match parent {
+            Some(dir) => dir.join(filename),
+            None => PathBuf::from(filename),
+        }
     }
 
     fn initialize_schema(connection: &Connection) -> rusqlite::Result<()> {
@@ -927,17 +966,23 @@ mod tests {
 
     #[test]
     fn test_06_new_returns_connection() {
-        cleanup_existing_files(Path::new(DATABASE_FILENAME))
-            .expect("Failed to remove pre-existing database file");
+        let db_path = unique_test_db_path();
+        cleanup_existing_files(&db_path).expect("Failed to remove pre-existing database file");
+        if let Some(parent) = db_path.parent() {
+            fs::create_dir_all(parent).expect("Failed to create database directory");
+        }
 
-        let result = LocalProductDb::new();
+        let path_str = db_path
+            .to_str()
+            .expect("Database path contains invalid UTF-8");
+        let result = LocalProductDb::new(path_str);
         assert!(
             result.is_some(),
             "Expected LocalProductDb::new to return Some"
         );
         drop(result);
 
-        cleanup_existing_files(Path::new(DATABASE_FILENAME))
+        cleanup_existing_files(&db_path)
             .expect("Failed to remove database file created during test");
     }
 }
