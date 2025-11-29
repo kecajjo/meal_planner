@@ -31,21 +31,21 @@ impl NutrientConstraint {
     where
         E: Into<NutrientType>,
     {
-        if let Some(min_val) = min {
-            if min_val < 0.0 {
-                return None;
-            }
+        if let Some(min_val) = min
+            && min_val < 0.0
+        {
+            return None;
         }
-        if let Some(max_val) = max {
-            if max_val < 0.0 {
-                return None;
-            }
+        if let Some(max_val) = max
+            && max_val < 0.0
+        {
+            return None;
         }
 
-        if let (Some(min_val), Some(max_val)) = (min, max) {
-            if min_val > max_val {
-                return None;
-            }
+        if let (Some(min_val), Some(max_val)) = (min, max)
+            && min_val > max_val
+        {
+            return None;
         }
 
         Some(Self {

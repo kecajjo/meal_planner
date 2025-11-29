@@ -76,19 +76,15 @@ mod tests {
         assert!(pc3.is_none());
         products.push(pc4.unwrap());
 
-        let mut nutrients = Vec::new();
-        nutrients.push(
+        let nutrients = vec![
             NutrientConstraint::new(MacroElementsType::Protein, Some(10.0), Some(20.0)).unwrap(),
-        );
-        nutrients
-            .push(NutrientConstraint::new(MacroElementsType::Fat, Some(5.0), Some(15.0)).unwrap());
-        nutrients.push(
+            NutrientConstraint::new(MacroElementsType::Fat, Some(5.0), Some(15.0)).unwrap(),
             NutrientConstraint::new(MacroElementsType::Carbs, Some(30.0), Some(60.0)).unwrap(),
-        );
+        ];
 
         MealConstraint {
-            products: products,
-            nutrients: nutrients,
+            products,
+            nutrients,
         }
     }
 

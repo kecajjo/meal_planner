@@ -121,7 +121,7 @@ impl Index<MacroElementsType> for MacroElements {
     }
 }
 
-impl<'a, 'b> Add<&'b MacroElements> for &'a MacroElements {
+impl<'b> Add<&'b MacroElements> for &MacroElements {
     type Output = MacroElements;
 
     fn add(self, rhs: &'b MacroElements) -> MacroElements {
@@ -259,10 +259,10 @@ mod tests {
     #[test]
     fn test_macro_elements_iter_order_and_values() {
         let me = MacroElements::new(5.0, 2.0, 7.0, 1.0, 3.0);
-        let mut iter = me.clone().into_iter();
+        let iter = me.clone().into_iter();
         let mut seen = std::collections::HashSet::new();
 
-        while let Some((elem_type, value)) = iter.next() {
+        for (elem_type, value) in iter {
             assert_eq!(value, me[elem_type]);
             assert!(seen.insert(elem_type), "Duplicate element in iterator");
         }

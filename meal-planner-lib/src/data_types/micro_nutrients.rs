@@ -97,7 +97,7 @@ impl IndexMut<MicroNutrientsType> for MicroNutrients {
     }
 }
 
-impl<'a, 'b> Add<&'b MicroNutrients> for &'a MicroNutrients {
+impl<'b> Add<&'b MicroNutrients> for &MicroNutrients {
     type Output = MicroNutrients;
 
     fn add(self, rhs: &'b MicroNutrients) -> MicroNutrients {

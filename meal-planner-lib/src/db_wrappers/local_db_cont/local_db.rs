@@ -9,7 +9,6 @@ use crate::data_types::{
 };
 use crate::db_wrappers::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
 use const_format::concatcp;
-use rusqlite;
 
 // cant make paths relative to this file
 const DATABASE_PATH: &str = "src/db_wrappers/local_db_cont/";
@@ -89,7 +88,7 @@ impl LocalProductDb {
         let mut stmt = self
             .sqlite_con
             .prepare(format!("SELECT name FROM pragma_table_info('{}')", table_name).as_str())
-            .expect(format!("Getting columns names of the {} table failed", table_name).as_str());
+            .unwrap_or_else(|_| panic!("Getting columns names of the {} table failed", table_name));
 
         let db_column_iter = stmt
             .query_map([], |row| row.get::<_, String>(0))
@@ -139,7 +138,7 @@ impl LocalProductDb {
                 .as_str(),
                 [],
             )
-            .expect(format!("Failed to create '{}' table", SqlTablesNames::Products).as_str());
+            .unwrap_or_else(|_| panic!("Failed to create '{}' table", SqlTablesNames::Products));
 
         let macro_elem_to_text = |x: MacroElementsType| {
             if MacroElementsType::Calories == x {
@@ -155,7 +154,7 @@ impl LocalProductDb {
             SqlTablesNames::MacroElements.to_string().as_str(),
             macro_elements_fields.as_str(),
         )
-        .expect(format!("Failed to create '{}' table", SqlTablesNames::MacroElements).as_str());
+        .unwrap_or_else(|_| panic!("Failed to create '{}' table", SqlTablesNames::MacroElements));
 
         let micronutrients_to_text = |x: MicroNutrientsType| format!("\"{}\" FLOAT,\n", x);
         let micronutrients_fields: String = MicroNutrientsType::iter()
@@ -166,13 +165,12 @@ impl LocalProductDb {
             SqlTablesNames::MicroNutrients.to_string().as_str(),
             micronutrients_fields.as_str(),
         )
-        .expect(
-            format!(
+        .unwrap_or_else(|_| {
+            panic!(
                 "Failed to create '{}' table",
                 SqlTablesNames::MicroNutrients
             )
-            .as_str(),
-        );
+        });
 
         let allowed_units_to_text = |x: AllowedUnitsType| match x {
             AllowedUnitsType::Piece => format!("\"{}\" INTEGER NOT NULL DEFAULT 1,\n", x),
@@ -186,7 +184,7 @@ impl LocalProductDb {
             SqlTablesNames::AllowedUnits.to_string().as_str(),
             allowed_units_fields.as_str(),
         )
-        .expect(format!("Failed to create '{}' table", SqlTablesNames::AllowedUnits).as_str());
+        .unwrap_or_else(|_| panic!("Failed to create '{}' table", SqlTablesNames::AllowedUnits));
     }
 
     fn create_table_for_table_name(
@@ -225,7 +223,7 @@ fn db_search_criteria_to_sql_query_fragment(
             query_fragment.push_str(" AND ");
         }
         match criterion {
-            DbSearchCriteria::ByName(name) => {
+            DbSearchCriteria::ById(name) => {
                 query_fragment.push_str(&format!(
                     "{}.name LIKE '{}%'",
                     SqlTablesNames::Products,
@@ -310,10 +308,8 @@ impl DbWrapper for LocalProductDb {
         // Helper closure to append columns from an enum iterator
         let mut append_columns =
             |table: SqlTablesNames, iter: &mut dyn Iterator<Item = Option<String>>| {
-                for col in iter {
-                    if let Some(col) = col {
-                        query_template.push_str(&format!(", {}.\"{}\"", table, col));
-                    }
+                for col in iter.flatten() {
+                    query_template.push_str(&format!(", {}.\"{}\"", table, col));
                 }
             };
 
@@ -360,7 +356,7 @@ impl DbWrapper for LocalProductDb {
 
         let mut result_map = HashMap::new();
         let product_iter = stmt
-            .query_map([], |row| map_query_row_to_product(row))
+            .query_map([], map_query_row_to_product)
             .expect("Failed to map query results")
             .map(|res| res.expect("Failed to map row to product"));
 
@@ -525,14 +521,16 @@ impl MutableDbWrapper for LocalProductDb {
                     ),
                     [],
                 )
-                .expect(&format!(
-                    "Failed to update {col} for {id}",
-                    col = col,
-                    id = product_id
-                ));
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Failed to update {col} for {id}",
+                        col = col,
+                        id = product_id
+                    )
+                });
         };
 
-        for (col, val) in vec![
+        for (col, val) in [
             ("name", format!("'{}'", product.name())),
             (
                 "brand",
@@ -545,13 +543,11 @@ impl MutableDbWrapper for LocalProductDb {
             run_query(&SqlTablesNames::Products.to_string(), col, &val);
         }
 
-        for (col, val) in product.macro_elements.into_iter().filter(|x| {
-            if MacroElementsType::Calories == x.0 {
-                return false;
-            } else {
-                return true;
-            }
-        }) {
+        for (col, val) in product
+            .macro_elements
+            .into_iter()
+            .filter(|x| MacroElementsType::Calories != x.0)
+        {
             run_query(
                 &SqlTablesNames::MacroElements.to_string(),
                 &col.to_string(),
@@ -573,7 +569,7 @@ impl MutableDbWrapper for LocalProductDb {
         }
 
         for col in AllowedUnitsType::iter() {
-            let value = if product.allowed_units.get(&col).is_some() {
+            let value = if product.allowed_units.contains_key(&col) {
                 product.allowed_units.get(&col).unwrap().to_string()
             } else {
                 "NULL".to_string()
@@ -715,7 +711,7 @@ mod tests {
                 Box::new(MacroElements::new(
                     1.0_f32, 0.5_f32, 2.0_f32, 1.0_f32, 3.0_f32,
                 )),
-                Box::new(MicroNutrients::default()),
+                Box::default(),
                 allowed_units,
             );
 
@@ -726,7 +722,7 @@ mod tests {
 
         let db = test_db.local_db();
         let results =
-            db.get_products_matching_criteria(&[DbSearchCriteria::ByName("Persisted".to_string())]);
+            db.get_products_matching_criteria(&[DbSearchCriteria::ById("Persisted".to_string())]);
         let key = "Persisted (BrandP)";
         assert!(
             results.contains_key(key),
@@ -833,12 +829,10 @@ mod tests {
             format!("{}_{}", stem, suffix)
         };
 
-        let candidate = match parent {
+        match parent {
             Some(dir) => dir.join(&filename),
             None => PathBuf::from(&filename),
-        };
-
-        candidate
+        }
     }
 
     fn cleanup_previous_test_databases() -> Result<(), String> {
@@ -964,7 +958,7 @@ mod tests {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let db = test_db.local_db();
         let results =
-            db.get_products_matching_criteria(&[DbSearchCriteria::ByName("Apple".to_string())]);
+            db.get_products_matching_criteria(&[DbSearchCriteria::ById("Apple".to_string())]);
         assert_eq!(results.len(), 1);
         let apple = results
             .get("Apple (BrandA)")
@@ -1013,7 +1007,7 @@ mod tests {
             Box::new(MacroElements::new(
                 0.1_f32, 0.05_f32, 11.0_f32, 9.0_f32, 1.0_f32,
             )),
-            Box::new(MicroNutrients::default()),
+            Box::default(),
             allowed_units,
         );
         let new_id = db.get_product_default_id(&new_product);
