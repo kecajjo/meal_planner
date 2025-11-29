@@ -145,7 +145,7 @@ impl LocalProductDb {
             "CREATE TABLE ?1 (
                 id TEXT NOT NULL PRIMARY KEY,
                 ?2
-                FOREIGN KEY(id) REFERENCES {}(id)
+                FOREIGN KEY(id) REFERENCES {}(id) ON DELETE CASCADE
             )",
             SqlTablesNames::Products
         );
@@ -165,7 +165,7 @@ impl LocalProductDb {
         )
         .expect(format!("Failed to create '{}' table", SqlTablesNames::MacroElements).as_str());
 
-        let micronutrients_to_text = |x: MicroNutrientsType| format!("'{}' FLOAT,\n", x);
+        let micronutrients_to_text = |x: MicroNutrientsType| format!("\"{}\" FLOAT,\n", x);
         let micronutrients_fields: String = MicroNutrientsType::iter()
             .map(micronutrients_to_text)
             .collect();
@@ -372,7 +372,7 @@ impl DbWrapper for LocalProductDb {
         quantity: u16,
     ) -> Result<(), String> {
         let update_query = format!(
-            "UPDATE {} SET \"{}\" = {} WHERE id = \"{}\";",
+            "UPDATE {} SET \"{}\" = {} WHERE id = '{}';",
             SqlTablesNames::AllowedUnits,
             allowed_unit,
             quantity,
@@ -392,11 +392,16 @@ impl DbWrapper for LocalProductDb {
 
 impl MutableDbWrapper for LocalProductDb {
     fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
-        let query_template = "INSERT INTO ?1 (?2) VALUES (?3);";
         let run_query =
             |table_name: &str, columns_str: &str, values_str: &str| -> Result<(), String> {
                 self.sqlite_con
-                    .execute(query_template, [table_name, columns_str, values_str])
+                    .execute(
+                        &format!(
+                            "INSERT INTO {} ({}) VALUES ({});",
+                            table_name, columns_str, values_str
+                        ),
+                        [],
+                    )
                     .map_err(|e| {
                         format!(
                             "Failed to insert product '{}' into {} table: {}",
@@ -410,10 +415,13 @@ impl MutableDbWrapper for LocalProductDb {
             &SqlTablesNames::Products.to_string(),
             "id, name, brand",
             format!(
-                "\"{}\", \"{}\", \"{}\"",
+                "'{}', '{}', {}",
                 product_id,
                 product.name(),
-                product.brand().unwrap_or("NULL")
+                match product.brand() {
+                    Some(brand) => format!("'{}'", brand),
+                    None => "NULL".to_string(),
+                }
             )
             .as_str(),
         )?;
@@ -479,13 +487,8 @@ impl MutableDbWrapper for LocalProductDb {
 
                 run_query(
                     $sql_table_var.to_string().as_str(),
-                    format!("id, \"{}\"", col_names).as_str(),
-                    format!(
-                        "\"{}\", \"{}\"",
-                        self.get_product_default_id(&product),
-                        values
-                    )
-                    .as_str(),
+                    format!("id, {}", col_names).as_str(),
+                    format!("'{}', {}", self.get_product_default_id(&product), values).as_str(),
                 )?;
             };
         }
@@ -510,10 +513,15 @@ impl MutableDbWrapper for LocalProductDb {
     }
 
     fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
-        let query_template = format!("UPDATE ?1 SET \"?2\" = ?3 where id = \"{}\";", product_id);
         let run_query = |table: &str, col: &str, val: &str| {
             self.sqlite_con
-                .execute(&query_template, [table, col, val])
+                .execute(
+                    &format!(
+                        "UPDATE {} SET \"{}\" = {} where id = '{}';",
+                        table, col, val, product_id
+                    ),
+                    [],
+                )
                 .expect(&format!(
                     "Failed to update {col} for {id}",
                     col = col,
@@ -522,10 +530,16 @@ impl MutableDbWrapper for LocalProductDb {
         };
 
         for (col, val) in vec![
-            ("name", product.name()),
-            ("brand", product.brand().unwrap_or("NULL")),
+            ("name", format!("'{}'", product.name())),
+            (
+                "brand",
+                match product.brand() {
+                    Some(brand) => format!("'{}'", brand),
+                    None => "NULL".to_string(),
+                },
+            ),
         ] {
-            run_query(&SqlTablesNames::Products.to_string(), col, val);
+            run_query(&SqlTablesNames::Products.to_string(), col, &val);
         }
 
         for (col, val) in product.macro_elements.into_iter().filter(|x| {
@@ -572,19 +586,22 @@ impl MutableDbWrapper for LocalProductDb {
     }
 
     fn delete_product(&mut self, product_id: &str) -> Result<(), String> {
-        for table in SqlTablesNames::iter() {
-            self.sqlite_con
-                .execute(
-                    format!("DELETE FROM {} WHERE id = \"{}\";", table, product_id).as_str(),
-                    [],
+        let main_table_name = SqlTablesNames::Products.to_string();
+        self.sqlite_con
+            .execute(
+                format!(
+                    "DELETE FROM {} WHERE id = '{}';",
+                    main_table_name, product_id
                 )
-                .map_err(|e| {
-                    format!(
-                        "Failed to delete product with ID '{}' from table '{}': {}",
-                        product_id, table, e
-                    )
-                })?;
-        }
+                .as_str(),
+                [],
+            )
+            .map_err(|e| {
+                format!(
+                    "Failed to delete product with ID '{}' from table '{}': {}",
+                    product_id, main_table_name, e
+                )
+            })?;
         Ok(())
     }
 }
