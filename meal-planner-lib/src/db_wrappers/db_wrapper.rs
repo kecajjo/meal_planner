@@ -9,21 +9,21 @@ use super::mock_db;
 
 pub enum DataBaseTypes {
     #[cfg(test)]
-    MockDb,
-    OpenFoodFactsDb,
-    LocalDb,
+    Mock,
+    OpenFoodFacts,
+    Local,
 }
 
 pub enum DbSearchCriteria {
-    ByName(String),
+    ById(String),
     // ByBarcode(String),
 }
 
 pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn DbWrapper>> {
     match db_type {
         #[cfg(test)]
-        DataBaseTypes::MockDb => Some(Box::new(mock_db::MockProductDb::new())),
-        DataBaseTypes::LocalDb => Some(Box::new(local_db::LocalProductDb::new(
+        DataBaseTypes::Mock => Some(Box::new(mock_db::MockProductDb::new())),
+        DataBaseTypes::Local => Some(Box::new(local_db::LocalProductDb::new(
             local_db::DATABASE_FILENAME,
         )?)),
         _ => panic!("Database type not supported in this build."),
@@ -80,8 +80,8 @@ pub trait DbWrapper {
     }
 
     fn get_product_by_id(&self, product_id: &str) -> Option<crate::data_types::Product> {
-        let mut results = self
-            .get_products_matching_criteria(&[DbSearchCriteria::ByName(product_id.to_string())]);
+        let mut results =
+            self.get_products_matching_criteria(&[DbSearchCriteria::ById(product_id.to_string())]);
         results.remove(product_id)
     }
 }
@@ -99,7 +99,7 @@ pub trait MutableDbWrapper: DbWrapper {
 #[cfg(test)]
 mod dbwrapper_trait_default_impl_tests {
     use super::*;
-    use crate::data_types::{AllowedUnitsType, MacroElements, MicroNutrients, Product};
+    use crate::data_types::{AllowedUnitsType, MacroElements, Product};
     use std::collections::HashMap;
 
     struct DummyDb {
@@ -112,15 +112,15 @@ mod dbwrapper_trait_default_impl_tests {
             &self,
             criteria: &[DbSearchCriteria],
         ) -> HashMap<String, Product> {
-            // Only ByName supported for this dummy
+            // Only ById supported for this dummy
             let mut map = HashMap::new();
             for crit in criteria {
                 // TODO: wont be necessary when there are more different criteria
                 #[allow(irrefutable_let_patterns)]
-                if let DbSearchCriteria::ByName(name) = crit {
-                    if let Some(prod) = self.products.get(name) {
-                        map.insert(name.clone(), prod.clone());
-                    }
+                if let DbSearchCriteria::ById(name) = crit
+                    && let Some(prod) = self.products.get(name)
+                {
+                    map.insert(name.clone(), prod.clone());
                 }
             }
             map
@@ -148,7 +148,7 @@ mod dbwrapper_trait_default_impl_tests {
             name.to_string(),
             brand.map(|b| b.to_string()),
             Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0)),
-            Box::new(MicroNutrients::default()),
+            Box::default(),
             {
                 let mut map = HashMap::new();
                 map.insert(AllowedUnitsType::Piece, 1);

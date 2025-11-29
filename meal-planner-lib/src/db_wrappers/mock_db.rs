@@ -17,7 +17,7 @@ impl MockProductDb {
     }
 
     fn create_sample_products(&mut self) {
-        let macro_elements = vec![
+        let macro_elements = [
             Box::new(MacroElements::new(1.0, 0.5, 2.0, 0.5, 3.0)),
             Box::new(MacroElements::new(0.5, 1.0, 0.5, 2.0, 1.0)),
             Box::new(MacroElements::new(2.0, 1.5, 1.0, 0.5, 0.0)),
@@ -25,13 +25,13 @@ impl MockProductDb {
             Box::new(MacroElements::new(0.0, 0.5, 1.5, 2.0, 1.0)),
             Box::new(MacroElements::new(2.5, 1.0, 0.0, 0.5, 1.5)),
         ];
-        let mut micro_nutrients = vec![
-            Box::new(MicroNutrients::default()),
-            Box::new(MicroNutrients::default()),
-            Box::new(MicroNutrients::default()),
-            Box::new(MicroNutrients::default()),
-            Box::new(MicroNutrients::default()),
-            Box::new(MicroNutrients::default()),
+        let mut micro_nutrients: [Box<MicroNutrients>; 6] = [
+            Box::default(),
+            Box::default(),
+            Box::default(),
+            Box::default(),
+            Box::default(),
+            Box::default(),
         ];
         micro_nutrients[0][MicroNutrientsType::Fiber] = Some(2.5);
         micro_nutrients[0][MicroNutrientsType::Zinc] = Some(3.5);
@@ -79,7 +79,7 @@ impl MockProductDb {
             },
         ];
 
-        let names = vec![
+        let names = [
             "Apple",
             "Beer",
             "Whiskey",
@@ -87,7 +87,7 @@ impl MockProductDb {
             "MixedNutrients",
             "Banana",
         ];
-        let brands = vec![
+        let brands = [
             Some("BrandedApple".to_string()),
             None,
             Some("BrandedWhiskey".to_string()),
@@ -152,7 +152,7 @@ impl DbWrapper for MockProductDb {
     ) -> HashMap<String, crate::data_types::Product> {
         let is_prod_matching_crit = |product: &Product, criterion: &DbSearchCriteria| -> bool {
             match criterion {
-                DbSearchCriteria::ByName(name_crit) => {
+                DbSearchCriteria::ById(name_crit) => {
                     self.get_product_default_id(product).starts_with(name_crit)
                 }
             }
@@ -192,7 +192,7 @@ mod tests {
     use std::vec;
 
     use super::*;
-    use crate::data_types::{MacroElements, MicroNutrients, Product};
+    use crate::data_types::{MacroElements, Product};
 
     #[test]
     fn test_new_and_sample_products() {
@@ -214,7 +214,7 @@ mod tests {
             "Orange".to_string(),
             Some("BrandedOrange".to_string()),
             Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0)),
-            Box::new(MicroNutrients::default()),
+            Box::default(),
             {
                 let mut map = std::collections::HashMap::new();
                 map.insert(crate::data_types::AllowedUnitsType::Piece, 1);
@@ -280,7 +280,7 @@ mod tests {
     fn test_get_products_matching_criteria_by_name() {
         let db = MockProductDb::new();
         use crate::db_wrappers::DbSearchCriteria;
-        let crit = vec![DbSearchCriteria::ByName("App".to_string())];
+        let crit = vec![DbSearchCriteria::ById("App".to_string())];
         let results = db.get_products_matching_criteria(&crit);
         assert_eq!(results.len(), 1);
         assert!(results.contains_key("Apple (BrandedApple)"));

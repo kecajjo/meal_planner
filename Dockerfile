@@ -11,6 +11,7 @@ USER root
         rustup component add rustfmt && \
         rm -rf /var/lib/apt/lists/*
 
+    RUN rustup component add clippy
 
 USER developer
     RUN mkdir -p /home/developer/repo

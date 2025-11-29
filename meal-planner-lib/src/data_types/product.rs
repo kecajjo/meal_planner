@@ -56,7 +56,7 @@ impl Product {
             brand,
             macro_elements,
             micro_nutrients,
-            allowed_units: allowed_units,
+            allowed_units,
         }
     }
 

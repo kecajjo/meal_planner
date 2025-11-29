@@ -21,10 +21,10 @@ impl ProductConstraint {
         if !food.allowed_units.contains_key(&unit) {
             return None;
         }
-        if let (Some(lb), Some(ub)) = (low_bound, up_bound) {
-            if lb > ub {
-                return None;
-            }
+        if let (Some(lb), Some(ub)) = (low_bound, up_bound)
+            && lb > ub
+        {
+            return None;
         }
         Some(Self {
             food,
