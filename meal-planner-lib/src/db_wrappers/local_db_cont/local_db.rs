@@ -618,17 +618,13 @@ mod tests {
     };
     use crate::db_wrappers::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
     use rusqlite::{Connection, params};
-    use std::cell::RefCell;
     use std::collections::HashMap;
     use std::fs;
     use std::path::{Path, PathBuf};
+    use std::sync::Once;
     use std::sync::atomic::{AtomicUsize, Ordering};
     #[allow(unused_imports)]
     use strum::IntoEnumIterator;
-
-    thread_local! {
-        static CLEANUP_REGISTRY: RefCell<Vec<FileCleanup>> = RefCell::new(Vec::new());
-    }
 
     fn assert_table_columns(connection: &Connection, table: &str, expected_columns: &[String]) {
         let count: i64 = connection
@@ -741,6 +737,7 @@ mod tests {
 
     struct TestDbGuard {
         path: PathBuf,
+        _cleanup_guard: FileCleanup,
     }
 
     impl TestDbGuard {
@@ -750,13 +747,17 @@ mod tests {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
+            let cleanup_guard = FileCleanup::new(path.clone());
             let path_str = path
                 .to_str()
                 .ok_or_else(|| "Database path contains invalid UTF-8".to_string())?;
             let db = LocalProductDb::new(path_str)
                 .ok_or_else(|| "LocalProductDb::new returned None".to_string())?;
             drop(db);
-            Ok(Self { path })
+            Ok(Self {
+                path,
+                _cleanup_guard: cleanup_guard,
+            })
         }
 
         fn create_seeded() -> Result<Self, String> {
@@ -810,6 +811,13 @@ mod tests {
     }
 
     fn unique_test_db_path() -> PathBuf {
+        static INIT_CLEANUP: Once = Once::new();
+        INIT_CLEANUP.call_once(|| {
+            if let Err(err) = cleanup_previous_test_databases() {
+                panic!("Failed to cleanup previous test databases: {}", err);
+            }
+        });
+
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let suffix = COUNTER.fetch_add(1, Ordering::Relaxed);
 
@@ -830,12 +838,47 @@ mod tests {
             None => PathBuf::from(&filename),
         };
 
-        CLEANUP_REGISTRY.with(|registry| {
-            registry
-                .borrow_mut()
-                .push(FileCleanup::new(candidate.clone()));
-        });
         candidate
+    }
+
+    fn cleanup_previous_test_databases() -> Result<(), String> {
+        let base_path = Path::new(DATABASE_FILENAME);
+        let parent = base_path
+            .parent()
+            .ok_or_else(|| "DATABASE_FILENAME has no parent directory".to_string())?;
+        let stem = base_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| "DATABASE_FILENAME stem is not valid UTF-8".to_string())?;
+        let prefix = format!("{}_", stem);
+        let extension = base_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|s| s.to_string());
+
+        let entries = fs::read_dir(parent).map_err(|e| e.to_string())?;
+        for entry in entries {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let file_stem = match path.file_stem().and_then(|s| s.to_str()) {
+                Some(stem_val) => stem_val,
+                None => continue,
+            };
+            if !file_stem.starts_with(&prefix) {
+                continue;
+            }
+            if let Some(ref expected_ext) = extension {
+                let actual_ext = path.extension().and_then(|e| e.to_str());
+                if actual_ext != Some(expected_ext.as_str()) {
+                    continue;
+                }
+            }
+            cleanup_existing_files(&path)?;
+        }
+        Ok(())
     }
 
     fn seed_products(db: &mut LocalProductDb) -> Result<(), String> {
