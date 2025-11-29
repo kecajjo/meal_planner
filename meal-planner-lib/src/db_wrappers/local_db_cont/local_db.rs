@@ -56,7 +56,7 @@ impl LocalProductDb {
     fn init_db_if_new_created(sqlite_con: &rusqlite::Connection) {
         let mut stmt = sqlite_con
             .prepare(&format!(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name={};",
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='{}';",
                 SqlTablesNames::Products
             ))
             .expect("Failed to prepare statement");
@@ -141,14 +141,6 @@ impl LocalProductDb {
             )
             .expect(format!("Failed to create '{}' table", SqlTablesNames::Products).as_str());
 
-        let table_schema = format!(
-            "CREATE TABLE ?1 (
-                id TEXT NOT NULL PRIMARY KEY,
-                ?2
-                FOREIGN KEY(id) REFERENCES {}(id) ON DELETE CASCADE
-            )",
-            SqlTablesNames::Products
-        );
         let macro_elem_to_text = |x: MacroElementsType| {
             if MacroElementsType::Calories == x {
                 "".to_string()
@@ -161,7 +153,6 @@ impl LocalProductDb {
         Self::create_table_for_table_name(
             sqlite_con,
             SqlTablesNames::MacroElements.to_string().as_str(),
-            table_schema.as_str(),
             macro_elements_fields.as_str(),
         )
         .expect(format!("Failed to create '{}' table", SqlTablesNames::MacroElements).as_str());
@@ -173,7 +164,6 @@ impl LocalProductDb {
         Self::create_table_for_table_name(
             sqlite_con,
             SqlTablesNames::MicroNutrients.to_string().as_str(),
-            table_schema.as_str(),
             micronutrients_fields.as_str(),
         )
         .expect(
@@ -194,7 +184,6 @@ impl LocalProductDb {
         Self::create_table_for_table_name(
             sqlite_con,
             SqlTablesNames::AllowedUnits.to_string().as_str(),
-            table_schema.as_str(),
             allowed_units_fields.as_str(),
         )
         .expect(format!("Failed to create '{}' table", SqlTablesNames::AllowedUnits).as_str());
@@ -203,11 +192,22 @@ impl LocalProductDb {
     fn create_table_for_table_name(
         sqlite_con: &rusqlite::Connection,
         table_name: &str,
-        table_schema: &str,
         data: &str,
     ) -> Result<(), String> {
         sqlite_con
-            .execute(table_schema, [table_name, data])
+            .execute(
+                &format!(
+                    "CREATE TABLE {} (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        {}
+                        FOREIGN KEY(id) REFERENCES {}(id) ON DELETE CASCADE
+                    )",
+                    table_name,
+                    data,
+                    SqlTablesNames::Products
+                ),
+                [],
+            )
             .map_err(|e| format!("Failed to create '{}' table: {}", table_name, e))?;
         Ok(())
     }
@@ -618,12 +618,17 @@ mod tests {
     };
     use crate::db_wrappers::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
     use rusqlite::{Connection, params};
+    use std::cell::RefCell;
     use std::collections::HashMap;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicUsize, Ordering};
     #[allow(unused_imports)]
     use strum::IntoEnumIterator;
+
+    thread_local! {
+        static CLEANUP_REGISTRY: RefCell<Vec<FileCleanup>> = RefCell::new(Vec::new());
+    }
 
     fn assert_table_columns(connection: &Connection, table: &str, expected_columns: &[String]) {
         let count: i64 = connection
@@ -652,7 +657,7 @@ mod tests {
     }
 
     #[test]
-    fn test_00_0_local_product_db_new_creates_schema() {
+    fn test_00_local_product_db_new_creates_schema() {
         let db_path = unique_test_db_path();
         let _cleanup_guard = FileCleanup::new(db_path.clone());
         cleanup_existing_files(&db_path).expect("Failed to clean up test database files");
@@ -701,7 +706,7 @@ mod tests {
     }
 
     #[test]
-    fn test_00_1_local_product_db_new_preserves_existing_data() {
+    fn test_01_local_product_db_new_preserves_existing_data() {
         let test_db = TestDbGuard::create_empty().expect("Failed to create empty database");
 
         {
@@ -820,10 +825,17 @@ mod tests {
             format!("{}_{}", stem, suffix)
         };
 
-        match parent {
-            Some(dir) => dir.join(filename),
-            None => PathBuf::from(filename),
-        }
+        let candidate = match parent {
+            Some(dir) => dir.join(&filename),
+            None => PathBuf::from(&filename),
+        };
+
+        CLEANUP_REGISTRY.with(|registry| {
+            registry
+                .borrow_mut()
+                .push(FileCleanup::new(candidate.clone()));
+        });
+        candidate
     }
 
     fn seed_products(db: &mut LocalProductDb) -> Result<(), String> {
@@ -887,7 +899,7 @@ mod tests {
     }
 
     #[test]
-    fn test_01_initialize_and_seed_database() {
+    fn test_02_initialize_and_seed_database() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let conn = test_db.connection();
         let product_count: i64 = conn
@@ -905,7 +917,7 @@ mod tests {
     }
 
     #[test]
-    fn test_02_get_products_matching_criteria_returns_expected_product() {
+    fn test_03_get_products_matching_criteria_returns_expected_product() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let db = test_db.local_db();
         let results =
@@ -929,7 +941,7 @@ mod tests {
     }
 
     #[test]
-    fn test_03_set_product_unit_updates_allowed_units_table() {
+    fn test_04_set_product_unit_updates_allowed_units_table() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         let result = db.set_product_unit("Apple (BrandA)", AllowedUnitsType::Cup, 3);
@@ -946,7 +958,7 @@ mod tests {
     }
 
     #[test]
-    fn test_04_add_product_inserts_all_related_rows() {
+    fn test_05_add_product_inserts_all_related_rows() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         let mut allowed_units: AllowedUnits = HashMap::new();
@@ -978,7 +990,7 @@ mod tests {
     }
 
     #[test]
-    fn test_05_update_product_modifies_macro_and_micro_values() {
+    fn test_06_update_product_modifies_macro_and_micro_values() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         let mut allowed_units: AllowedUnits = HashMap::new();
@@ -1012,7 +1024,7 @@ mod tests {
     }
 
     #[test]
-    fn test_06_delete_product_removes_all_rows() {
+    fn test_07_delete_product_removes_all_rows() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         assert!(
@@ -1031,8 +1043,9 @@ mod tests {
     }
 
     #[test]
-    fn test_07_new_returns_connection() {
+    fn test_08_new_returns_connection() {
         let db_path = unique_test_db_path();
+        let _cleanup_guard = FileCleanup::new(db_path.clone());
         cleanup_existing_files(&db_path).expect("Failed to remove pre-existing database file");
         if let Some(parent) = db_path.parent() {
             fs::create_dir_all(parent).expect("Failed to create database directory");
@@ -1047,8 +1060,5 @@ mod tests {
             "Expected LocalProductDb::new to return Some"
         );
         drop(result);
-
-        cleanup_existing_files(&db_path)
-            .expect("Failed to remove database file created during test");
     }
 }
