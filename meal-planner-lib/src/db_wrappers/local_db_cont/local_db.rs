@@ -46,14 +46,19 @@ impl fmt::Display for SqlTablesNames {
 impl LocalProductDb {
     pub fn new() -> Option<Self> {
         let con =
-            rusqlite::Connection::open(DATABASE_PATH).expect("Failed to open SQLite database");
+            rusqlite::Connection::open(DATABASE_FILENAME).expect("Failed to open SQLite database");
+        con.execute("PRAGMA foreign_keys = ON;", [])
+            .expect("Failed to enable foreign keys");
         Some(LocalProductDb { sqlite_con: con })
     }
 
     fn init_db_if_new_created(&self) {
         let mut stmt = self
             .sqlite_con
-            .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='products';")
+            .prepare(&format!(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name={};",
+                SqlTablesNames::Products
+            ))
             .expect("Failed to prepare statement");
         let mut rows = stmt.query([]).expect("Failed to execute query");
         if rows.next().expect("Failed to fetch row").is_none() {
@@ -104,7 +109,7 @@ impl LocalProductDb {
 
         for col in missing_columns {
             let alter_table_query = format!(
-                "ALTER TABLE {} ADD COLUMN {} {};",
+                "ALTER TABLE {} ADD COLUMN \"{}\" {};",
                 table_name, col, col_type
             );
             self.sqlite_con
@@ -148,7 +153,7 @@ impl LocalProductDb {
             if MacroElementsType::Calories == x {
                 "".to_string()
             } else {
-                format!("{} FLOAT NOT NULL,\n", x)
+                format!("\"{}\" FLOAT NOT NULL,\n", x)
             }
         };
         let macro_elements_fields: String =
@@ -160,7 +165,7 @@ impl LocalProductDb {
         )
         .expect(format!("Failed to create '{}' table", SqlTablesNames::MacroElements).as_str());
 
-        let micronutrients_to_text = |x: MicroNutrientsType| format!("{} FLOAT,\n", x);
+        let micronutrients_to_text = |x: MicroNutrientsType| format!("'{}' FLOAT,\n", x);
         let micronutrients_fields: String = MicroNutrientsType::iter()
             .map(micronutrients_to_text)
             .collect();
@@ -178,8 +183,8 @@ impl LocalProductDb {
         );
 
         let allowed_units_to_text = |x: AllowedUnitsType| match x {
-            AllowedUnitsType::Piece => format!("{} INTEGER NOT NULL DEFAULT 1,\n", x),
-            _ => format!("{} INTEGER,\n", x),
+            AllowedUnitsType::Piece => format!("\"{}\" INTEGER NOT NULL DEFAULT 1,\n", x),
+            _ => format!("\"{}\" INTEGER,\n", x),
         };
         let allowed_units_fields: String = AllowedUnitsType::iter()
             .map(allowed_units_to_text)
@@ -304,7 +309,7 @@ impl DbWrapper for LocalProductDb {
             |table: SqlTablesNames, iter: &mut dyn Iterator<Item = Option<String>>| {
                 for col in iter {
                     if let Some(col) = col {
-                        query_template.push_str(&format!(", {}.{}", table, col));
+                        query_template.push_str(&format!(", {}.\"{}\"", table, col));
                     }
                 }
             };
@@ -367,7 +372,7 @@ impl DbWrapper for LocalProductDb {
         quantity: u16,
     ) -> Result<(), String> {
         let update_query = format!(
-            "UPDATE {} SET {} = {} WHERE id = {};",
+            "UPDATE {} SET \"{}\" = {} WHERE id = \"{}\";",
             SqlTablesNames::AllowedUnits,
             allowed_unit,
             quantity,
@@ -405,7 +410,7 @@ impl MutableDbWrapper for LocalProductDb {
             &SqlTablesNames::Products.to_string(),
             "id, name, brand",
             format!(
-                "{}, {}, {}",
+                "\"{}\", \"{}\", \"{}\"",
                 product_id,
                 product.name(),
                 product.brand().unwrap_or("NULL")
@@ -417,14 +422,14 @@ impl MutableDbWrapper for LocalProductDb {
             ($it:expr, MacroElements, columns) => {
                 $it.filter_map(|x| match x {
                     MacroElementsType::Calories => None,
-                    _ => Some(format!("{}, ", x)),
+                    _ => Some(format!("\"{}\", ", x)),
                 })
             };
             ($it:expr, MicroNutrients, columns) => {
-                $it.map(|x| format!("{}, ", x))
+                $it.map(|x| format!("\"{}\", ", x))
             };
             ($it:expr, AllowedUnits, columns) => {
-                $it.map(|x| format!("{}, ", x))
+                $it.map(|x| format!("\"{}\", ", x))
             };
             ($it:expr, MacroElements, values) => {
                 $it.filter_map(|x| match x {
@@ -474,8 +479,13 @@ impl MutableDbWrapper for LocalProductDb {
 
                 run_query(
                     $sql_table_var.to_string().as_str(),
-                    format!("id, {}", col_names).as_str(),
-                    format!("{}, {}", self.get_product_default_id(&product), values).as_str(),
+                    format!("id, \"{}\"", col_names).as_str(),
+                    format!(
+                        "\"{}\", \"{}\"",
+                        self.get_product_default_id(&product),
+                        values
+                    )
+                    .as_str(),
                 )?;
             };
         }
@@ -500,7 +510,7 @@ impl MutableDbWrapper for LocalProductDb {
     }
 
     fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
-        let query_template = format!("UPDATE ?1 SET ?2 = ?3 where id = {}", product_id);
+        let query_template = format!("UPDATE ?1 SET \"?2\" = ?3 where id = \"{}\";", product_id);
         let run_query = |table: &str, col: &str, val: &str| {
             self.sqlite_con
                 .execute(&query_template, [table, col, val])
@@ -565,7 +575,7 @@ impl MutableDbWrapper for LocalProductDb {
         for table in SqlTablesNames::iter() {
             self.sqlite_con
                 .execute(
-                    format!("DELETE FROM {} WHERE id = {};", table, product_id).as_str(),
+                    format!("DELETE FROM {} WHERE id = \"{}\";", table, product_id).as_str(),
                     [],
                 )
                 .map_err(|e| {
@@ -576,5 +586,358 @@ impl MutableDbWrapper for LocalProductDb {
                 })?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data_types::{
+        AllowedUnits, AllowedUnitsType, MacroElements, MacroElementsType, MicroNutrients,
+        MicroNutrientsType,
+    };
+    use crate::db_wrappers::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
+    use rusqlite::{Connection, params};
+    use std::collections::HashMap;
+    use std::fs; 
+    use std::path::{Path, PathBuf};
+
+    struct TestDbGuard {
+        path: PathBuf,
+    }
+
+    impl TestDbGuard {
+        fn create_seeded() -> Result<Self, String> {
+            let path = PathBuf::from(DATABASE_FILENAME);
+            cleanup_existing_files(&path)?;
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            let connection = Connection::open(&path).map_err(|e| e.to_string())?;
+            initialize_schema(&connection).map_err(|e| e.to_string())?;
+            seed_products(&connection).map_err(|e| e.to_string())?;
+            drop(connection);
+            Ok(Self { path })
+        }
+
+        fn connection(&self) -> Connection {
+            Connection::open(&self.path).expect("Failed to reopen test database")
+        }
+
+        fn local_db(&self) -> LocalProductDb {
+            let connection = self.connection();
+            LocalProductDb {
+                sqlite_con: connection,
+            }
+        }
+    }
+
+    impl Drop for TestDbGuard {
+        fn drop(&mut self) {
+            let _ = cleanup_existing_files(&self.path);
+        }
+    }
+
+    fn cleanup_existing_files(path: &Path) -> Result<(), String> {
+        if path.exists() {
+            std::fs::remove_file(path).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    fn initialize_schema(connection: &Connection) -> rusqlite::Result<()> {
+        connection.execute("PRAGMA foreign_keys = ON;", [])?;
+        connection.execute(
+            "CREATE TABLE products (
+                id TEXT NOT NULL PRIMARY KEY,
+                name CHAR NOT NULL,
+                brand CHAR
+            );",
+            [],
+        )?;
+        connection.execute(
+            "CREATE TABLE macro_elements (
+                id TEXT NOT NULL PRIMARY KEY,
+                \"Fat\" FLOAT NOT NULL,
+                \"Saturated Fat\" FLOAT NOT NULL,
+                \"Carbohydrates\" FLOAT NOT NULL,
+                \"Sugar\" FLOAT NOT NULL,
+                \"Protein\" FLOAT NOT NULL,
+                FOREIGN KEY(id) REFERENCES products(id)
+            );",
+            [],
+        )?;
+        connection.execute(
+            "CREATE TABLE micronutrients (
+                id TEXT NOT NULL PRIMARY KEY,
+                Fiber FLOAT,
+                Zinc FLOAT,
+                Sodium FLOAT,
+                Alcohol FLOAT,
+                FOREIGN KEY(id) REFERENCES products(id)
+            );",
+            [],
+        )?;
+        connection.execute(
+            "CREATE TABLE allowed_units (
+                id TEXT NOT NULL PRIMARY KEY,
+                piece INTEGER NOT NULL DEFAULT 1,
+                cup INTEGER,
+                tablespoon INTEGER,
+                teaspoon INTEGER,
+                box INTEGER,
+                custom INTEGER,
+                FOREIGN KEY(id) REFERENCES products(id)
+            );",
+            [],
+        )?;
+        Ok(())
+    }
+
+    fn seed_products(connection: &Connection) -> rusqlite::Result<()> {
+        let seeds = vec![
+            SeedProduct {
+                id: "Apple (BrandA)",
+                name: "Apple",
+                brand: Some("BrandA"),
+                macro_elements: (0.2_f32, 0.1_f32, 14.0_f32, 10.0_f32, 0.3_f32),
+                micro_nutrients: [Some(2.4_f32), Some(0.1_f32), Some(1.0_f32), None],
+                allowed_units: [Some(1), Some(1), None, None, None, None],
+            },
+            SeedProduct {
+                id: "Banana",
+                name: "Banana",
+                brand: None,
+                macro_elements: (0.3_f32, 0.1_f32, 23.0_f32, 12.0_f32, 1.1_f32),
+                micro_nutrients: [Some(2.6_f32), None, Some(1.0_f32), None],
+                allowed_units: [Some(1), None, Some(2), None, None, Some(50)],
+            },
+        ];
+
+        for product in seeds {
+            connection.execute(
+                "INSERT INTO products (id, name, brand) VALUES (?1, ?2, ?3);",
+                params![product.id, product.name, product.brand],
+            )?;
+            connection.execute(
+                "INSERT INTO macro_elements (
+                    id,
+                    \"Fat\",
+                    \"Saturated Fat\",
+                    \"Carbohydrates\",
+                    \"Sugar\",
+                    \"Protein\"
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6);",
+                params![
+                    product.id,
+                    product.macro_elements.0,
+                    product.macro_elements.1,
+                    product.macro_elements.2,
+                    product.macro_elements.3,
+                    product.macro_elements.4,
+                ],
+            )?;
+            connection.execute(
+                "INSERT INTO micronutrients (id, Fiber, Zinc, Sodium, Alcohol)
+                 VALUES (?1, ?2, ?3, ?4, ?5);",
+                params![
+                    product.id,
+                    product.micro_nutrients[0],
+                    product.micro_nutrients[1],
+                    product.micro_nutrients[2],
+                    product.micro_nutrients[3],
+                ],
+            )?;
+            connection.execute(
+                "INSERT INTO allowed_units (
+                    id,
+                    piece,
+                    cup,
+                    tablespoon,
+                    teaspoon,
+                    box,
+                    custom
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);",
+                params![
+                    product.id,
+                    product.allowed_units[0],
+                    product.allowed_units[1],
+                    product.allowed_units[2],
+                    product.allowed_units[3],
+                    product.allowed_units[4],
+                    product.allowed_units[5],
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    struct SeedProduct {
+        id: &'static str,
+        name: &'static str,
+        brand: Option<&'static str>,
+        macro_elements: (f32, f32, f32, f32, f32),
+        micro_nutrients: [Option<f32>; MicroNutrientsType::COUNT],
+        allowed_units: [Option<u16>; AllowedUnitsType::COUNT],
+    }
+
+    #[test]
+    fn test_00_initialize_and_seed_database() {
+        let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
+        let conn = test_db.connection();
+        let product_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM products;", [], |row| row.get(0))
+            .expect("Failed to count products");
+        assert_eq!(product_count, 2);
+        let macro_columns: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('macro_elements');",
+                [],
+                |row| row.get(0),
+            )
+            .expect("Failed to count macro columns");
+        assert_eq!(macro_columns, 6);
+    }
+
+    #[test]
+    fn test_01_get_products_matching_criteria_returns_expected_product() {
+        let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
+        let db = test_db.local_db();
+        let results =
+            db.get_products_matching_criteria(&[DbSearchCriteria::ByName("Apple".to_string())]);
+        assert_eq!(results.len(), 1);
+        let apple = results
+            .get("Apple (BrandA)")
+            .expect("Missing Apple product");
+        assert_eq!(apple.name(), "Apple");
+        assert_eq!(apple.brand(), Some("BrandA"));
+        assert_eq!(
+            apple.macro_elements[MacroElementsType::Fat],
+            0.2_f32,
+            "Unexpected fat value"
+        );
+        assert_eq!(
+            apple.micro_nutrients[MicroNutrientsType::Fiber],
+            Some(2.4_f32)
+        );
+        assert_eq!(apple.allowed_units[&AllowedUnitsType::Piece], 1);
+    }
+
+    #[test]
+    fn test_02_set_product_unit_updates_allowed_units_table() {
+        let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
+        let mut db = test_db.local_db();
+        let result = db.set_product_unit("Apple (BrandA)", AllowedUnitsType::Cup, 3);
+        assert!(result.is_ok());
+        let conn = test_db.connection();
+        let updated: Option<u16> = conn
+            .query_row(
+                "SELECT cup FROM allowed_units WHERE id = ?1;",
+                params!["Apple (BrandA)"],
+                |row| row.get(0),
+            )
+            .expect("Failed to fetch updated unit");
+        assert_eq!(updated, Some(3));
+    }
+
+    #[test]
+    fn test_03_add_product_inserts_all_related_rows() {
+        let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
+        let mut db = test_db.local_db();
+        let mut allowed_units: AllowedUnits = HashMap::new();
+        allowed_units.insert(AllowedUnitsType::Piece, 1);
+        allowed_units.insert(AllowedUnitsType::Cup, 2);
+        let new_product = Product::new(
+            "Orange".to_string(),
+            Some("CitrusCo".to_string()),
+            Box::new(MacroElements::new(
+                0.1_f32, 0.05_f32, 11.0_f32, 9.0_f32, 1.0_f32,
+            )),
+            Box::new(MicroNutrients::default()),
+            allowed_units,
+        );
+        let new_id = db.get_product_default_id(&new_product);
+        assert!(
+            db.add_product(new_id.as_str(), new_product.clone()).is_ok(),
+            "Expected add_product to succeed"
+        );
+        let conn = test_db.connection();
+        let product_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM products WHERE id = ?1;",
+                params![new_id],
+                |row| row.get(0),
+            )
+            .expect("Failed to verify inserted product");
+        assert_eq!(product_count, 1);
+    }
+
+    #[test]
+    fn test_04_update_product_modifies_macro_and_micro_values() {
+        let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
+        let mut db = test_db.local_db();
+        let mut allowed_units: AllowedUnits = HashMap::new();
+        allowed_units.insert(AllowedUnitsType::Piece, 1);
+        allowed_units.insert(AllowedUnitsType::Custom, 250);
+        let mut micro = Box::new(MicroNutrients::default());
+        micro[MicroNutrientsType::Fiber] = Some(3.0_f32);
+        micro[MicroNutrientsType::Zinc] = Some(0.2_f32);
+        let updated = Product::new(
+            "Apple".to_string(),
+            Some("BrandA".to_string()),
+            Box::new(MacroElements::new(
+                0.5_f32, 0.2_f32, 15.0_f32, 11.0_f32, 0.9_f32,
+            )),
+            micro,
+            allowed_units,
+        );
+        assert!(
+            db.update_product("Apple (BrandA)", updated).is_ok(),
+            "Expected update_product to succeed"
+        );
+        let conn = test_db.connection();
+        let fiber: Option<f32> = conn
+            .query_row(
+                "SELECT Fiber FROM micronutrients WHERE id = ?1;",
+                params!["Apple (BrandA)"],
+                |row| row.get(0),
+            )
+            .expect("Failed to fetch updated fiber");
+        assert_eq!(fiber, Some(3.0_f32));
+    }
+
+    #[test]
+    fn test_05_delete_product_removes_all_rows() {
+        let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
+        let mut db = test_db.local_db();
+        assert!(
+            db.delete_product("Banana").is_ok(),
+            "Expected delete_product to succeed"
+        );
+        let conn = test_db.connection();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM products WHERE id = ?1;",
+                params!["Banana"],
+                |row| row.get(0),
+            )
+            .expect("Failed to check product deletion");
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_06_new_returns_connection() {
+        cleanup_existing_files(Path::new(DATABASE_FILENAME))
+            .expect("Failed to remove pre-existing database file");
+
+        let result = LocalProductDb::new();
+        assert!(
+            result.is_some(),
+            "Expected LocalProductDb::new to return Some"
+        );
+        drop(result);
+
+        cleanup_existing_files(Path::new(DATABASE_FILENAME))
+            .expect("Failed to remove database file created during test");
     }
 }
