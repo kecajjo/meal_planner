@@ -2,10 +2,20 @@ use core::fmt;
 use std::hash::Hash;
 use strum_macros::{EnumCount, EnumIter};
 
-use super::{macro_elements::MacroElements, micro_nutrients::MicroNutrients};
+use super::{
+    macro_elements::MacroElements, macro_elements::MacroElementsType,
+    micro_nutrients::MicroNutrients, micro_nutrients::MicroNutrientsType,
+};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NutrientType {
+    Macro(MacroElementsType),
+    Micro(MicroNutrientsType),
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter, EnumCount)]
 pub enum AllowedUnitsType {
+    Gram,
     Piece,
     Cup,
     Tablespoon,
@@ -17,6 +27,7 @@ pub enum AllowedUnitsType {
 impl fmt::Display for AllowedUnitsType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let unit_str = match self {
+            AllowedUnitsType::Gram => "gram",
             AllowedUnitsType::Piece => "piece",
             AllowedUnitsType::Cup => "cup",
             AllowedUnitsType::Tablespoon => "tablespoon",
@@ -28,8 +39,21 @@ impl fmt::Display for AllowedUnitsType {
     }
 }
 
-const DEFAULT_ALLOWED_UNITS: (AllowedUnitsType, u16) = (AllowedUnitsType::Piece, 1);
-pub type AllowedUnits = std::collections::HashMap<AllowedUnitsType, u16>;
+const DEFAULT_ALLOWED_UNITS: (AllowedUnitsType, UnitData) = (
+    AllowedUnitsType::Gram,
+    UnitData {
+        amount: 1,
+        divider: 1,
+    },
+);
+
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Hash)]
+pub struct UnitData {
+    pub amount: u16,
+    pub divider: u16,
+}
+
+pub type AllowedUnits = std::collections::HashMap<AllowedUnitsType, UnitData>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Product {
@@ -78,6 +102,14 @@ impl Product {
             _ => self.name.clone(),
         }
     }
+
+    #[must_use]
+    pub fn get_nutrient_amount(&self, nutrient: NutrientType) -> Option<f32> {
+        match nutrient {
+            NutrientType::Macro(macro_type) => Some(self.macro_elements[macro_type]),
+            NutrientType::Micro(micro_type) => self.micro_nutrients[micro_type],
+        }
+    }
 }
 
 #[cfg(test)]
@@ -97,7 +129,13 @@ mod tests {
             micro_nutrients,
             {
                 let mut allowed_units = std::collections::HashMap::new();
-                allowed_units.insert(AllowedUnitsType::Piece, 123);
+                allowed_units.insert(
+                    AllowedUnitsType::Gram,
+                    UnitData {
+                        amount: 123,
+                        divider: 1,
+                    },
+                );
                 allowed_units
             },
         );
@@ -106,7 +144,13 @@ mod tests {
         assert_relative_eq!(product.macro_elements[MacroElementsType::Fat], 1.0);
         assert_eq!(product.micro_nutrients[MicroNutrientsType::Fiber], None);
         let mut expected_allowed_units = std::collections::HashMap::new();
-        expected_allowed_units.insert(AllowedUnitsType::Piece, 123);
+        expected_allowed_units.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 123,
+                divider: 1,
+            },
+        );
         assert_eq!(product.allowed_units, expected_allowed_units);
     }
 
@@ -122,7 +166,13 @@ mod tests {
             micro_nutrients,
             allowed_units: {
                 let mut allowed_units = std::collections::HashMap::new();
-                allowed_units.insert(AllowedUnitsType::Piece, 100);
+                allowed_units.insert(
+                    AllowedUnitsType::Gram,
+                    UnitData {
+                        amount: 100,
+                        divider: 1,
+                    },
+                );
                 allowed_units
             },
         };
@@ -135,7 +185,13 @@ mod tests {
         );
         assert_eq!(product.micro_nutrients[MicroNutrientsType::Zinc], None);
         let mut expected_allowed_units = std::collections::HashMap::new();
-        expected_allowed_units.insert(AllowedUnitsType::Piece, 100);
+        expected_allowed_units.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 100,
+                divider: 1,
+            },
+        );
         assert_eq!(product.allowed_units, expected_allowed_units);
     }
 
@@ -151,14 +207,20 @@ mod tests {
             std::collections::HashMap::new(),
         );
         let mut expected_allowed_units = std::collections::HashMap::new();
-        expected_allowed_units.insert(AllowedUnitsType::Piece, 1);
+        expected_allowed_units.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 1,
+                divider: 1,
+            },
+        );
         assert_eq!(product.allowed_units, expected_allowed_units);
         assert_eq!(product.brand(), None);
     }
 
     #[test]
     fn test_common_units_display() {
-        assert_eq!(AllowedUnitsType::Piece.to_string(), "piece");
+        assert_eq!(AllowedUnitsType::Gram.to_string(), "gram");
         assert_eq!(AllowedUnitsType::Cup.to_string(), "cup");
         assert_eq!(AllowedUnitsType::Tablespoon.to_string(), "tablespoon");
         assert_eq!(AllowedUnitsType::Teaspoon.to_string(), "teaspoon");
@@ -206,8 +268,11 @@ mod tests {
             std::collections::HashMap::new(),
         );
         assert_eq!(
-            product.allowed_units.get(&AllowedUnitsType::Piece),
-            Some(&1)
+            product.allowed_units.get(&AllowedUnitsType::Gram),
+            Some(&UnitData {
+                amount: 1,
+                divider: 1
+            })
         );
         assert_eq!(product.allowed_units.len(), 1);
     }
@@ -217,8 +282,20 @@ mod tests {
         let macro_elements = Box::new(MacroElements::new(0.0, 0.0, 0.0, 0.0, 0.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
         let mut allowed_units = std::collections::HashMap::new();
-        allowed_units.insert(AllowedUnitsType::Cup, 2);
-        allowed_units.insert(AllowedUnitsType::Box, 5);
+        allowed_units.insert(
+            AllowedUnitsType::Cup,
+            UnitData {
+                amount: 2,
+                divider: 1,
+            },
+        );
+        allowed_units.insert(
+            AllowedUnitsType::Box,
+            UnitData {
+                amount: 5,
+                divider: 1,
+            },
+        );
         let product = Product::new(
             "MultiUnit".to_string(),
             None,

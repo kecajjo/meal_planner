@@ -6,7 +6,7 @@ use strum_macros::EnumIter;
 
 use crate::data_types::{
     AllowedUnits, AllowedUnitsType, MacroElements, MacroElementsType, MicroNutrients,
-    MicroNutrientsType, Product,
+    MicroNutrientsType, Product, UnitData,
 };
 use crate::db_wrappers::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
 use const_format::concatcp;
@@ -169,8 +169,10 @@ impl LocalProductDb {
         });
 
         let allowed_units_to_text = |x: AllowedUnitsType| match x {
-            AllowedUnitsType::Piece => format!("\"{x}\" INTEGER NOT NULL DEFAULT 1,\n"),
-            _ => format!("\"{x}\" INTEGER,\n"),
+            AllowedUnitsType::Gram => format!(
+                "\"{x}\" INTEGER NOT NULL DEFAULT 1,\n\"{x} divider\" INTEGER NOT NULL DEFAULT 1,\n"
+            ),
+            _ => format!("\"{x}\" INTEGER,\n\"{x} divider\" INTEGER,\n"),
         };
         let allowed_units_fields: String = AllowedUnitsType::iter()
             .map(allowed_units_to_text)
@@ -272,12 +274,30 @@ fn map_query_row_to_product(row: &rusqlite::Row) -> (String, Product) {
     }
 
     let iter_allowed_units = AllowedUnitsType::iter().map(|u| {
-        row.get_unwrap((SelectColumnIndexToProductData::AllowedUnitsStart as usize) + (u as usize))
+        row.get_unwrap(
+            (SelectColumnIndexToProductData::AllowedUnitsStart as usize) + (2 * u as usize),
+        )
+    });
+    let iter_allowed_units_div = AllowedUnitsType::iter().map(|u| {
+        row.get_unwrap(
+            (SelectColumnIndexToProductData::AllowedUnitsStart as usize) + (2 * u as usize + 1),
+        )
     });
     let mut allowed_units: AllowedUnits = HashMap::new();
-    for (unit, quantity) in AllowedUnitsType::iter().zip(iter_allowed_units) {
-        if let Some(qty) = quantity {
-            allowed_units.insert(unit, qty);
+    for ((unit, quantity), divider) in AllowedUnitsType::iter()
+        .zip(iter_allowed_units)
+        .zip(iter_allowed_units_div)
+    {
+        if let Some(qty) = quantity
+            && let Some(div) = divider
+        {
+            allowed_units.insert(
+                unit,
+                UnitData {
+                    amount: qty,
+                    divider: div,
+                },
+            );
         }
     }
 
@@ -325,10 +345,9 @@ impl DbWrapper for LocalProductDb {
             SqlTablesNames::MicroNutrients,
             &mut MicroNutrientsType::iter().map(|m| Some(m.to_string())),
         );
-        append_columns(
-            SqlTablesNames::AllowedUnits,
-            &mut AllowedUnitsType::iter().map(|m| Some(m.to_string())),
-        );
+        let mut allowed_columns_iter = AllowedUnitsType::iter()
+            .flat_map(|unit| [Some(unit.to_string()), Some(format!("{unit} divider"))].into_iter());
+        append_columns(SqlTablesNames::AllowedUnits, &mut allowed_columns_iter);
 
         write!(
             query_template,
@@ -368,13 +387,15 @@ impl DbWrapper for LocalProductDb {
         &mut self,
         product_id: &str,
         allowed_unit: AllowedUnitsType,
-        quantity: u16,
+        unit_data: UnitData,
     ) -> Result<(), String> {
         let update_query = format!(
-            "UPDATE {} SET \"{}\" = {} WHERE id = '{}';",
+            "UPDATE {} SET \"{}\" = {}, \"{}\" = {} WHERE id = '{}';",
             SqlTablesNames::AllowedUnits,
             allowed_unit,
-            quantity,
+            unit_data.amount,
+            allowed_unit.to_string() + " divider",
+            unit_data.divider,
             product_id
         );
         self.sqlite_con
@@ -433,7 +454,7 @@ impl MutableDbWrapper for LocalProductDb {
                 $it.map(|x| format!("\"{x}\", "))
             };
             ($it:expr, AllowedUnits, columns) => {
-                $it.map(|x| format!("\"{x}\", "))
+                $it.map(|x| format!("\"{x}\", \"{} divider\", ", x))
             };
             ($it:expr, MacroElements, values) => {
                 $it.filter_map(|x| match x {
@@ -455,9 +476,9 @@ impl MutableDbWrapper for LocalProductDb {
                 $it.map(|x| {
                     let val = product.allowed_units.get(&x);
                     if val.is_none() {
-                        "NULL, ".to_string()
+                        "NULL, NULL, ".to_string()
                     } else {
-                        format!("{}, ", val.unwrap())
+                        format!("{}, {}, ", val.unwrap().amount, val.unwrap().divider)
                     }
                 })
             };
@@ -558,7 +579,7 @@ impl MutableDbWrapper for LocalProductDb {
 
         for col in AllowedUnitsType::iter() {
             let value = if product.allowed_units.contains_key(&col) {
-                product.allowed_units.get(&col).unwrap().to_string()
+                product.allowed_units.get(&col).unwrap().amount.to_string()
             } else {
                 "NULL".to_string()
             };
@@ -566,6 +587,16 @@ impl MutableDbWrapper for LocalProductDb {
                 &SqlTablesNames::AllowedUnits.to_string(),
                 &col.to_string(),
                 &value,
+            );
+            let divider_value = if product.allowed_units.contains_key(&col) {
+                product.allowed_units.get(&col).unwrap().divider.to_string()
+            } else {
+                "NULL".to_string()
+            };
+            run_query(
+                &SqlTablesNames::AllowedUnits.to_string(),
+                &(col.to_string() + " divider"),
+                &divider_value,
             );
         }
 
@@ -596,7 +627,7 @@ mod tests {
     use super::*;
     use crate::data_types::{
         AllowedUnits, AllowedUnitsType, MacroElements, MacroElementsType, MicroNutrients,
-        MicroNutrientsType,
+        MicroNutrientsType, UnitData,
     };
     use crate::db_wrappers::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
     use approx::assert_relative_eq;
@@ -672,7 +703,10 @@ mod tests {
         nutrient_columns.extend(MicroNutrientsType::iter().map(|m| m.to_string()));
 
         let mut allowed_columns = vec!["id".to_string()];
-        allowed_columns.extend(AllowedUnitsType::iter().map(|u| u.to_string()));
+        for unit in AllowedUnitsType::iter() {
+            allowed_columns.push(unit.to_string());
+            allowed_columns.push(format!("{unit} divider"));
+        }
 
         let product_columns = vec!["id".to_string(), "name".to_string(), "brand".to_string()];
         assert_table_columns(&connection, "products", &product_columns);
@@ -690,7 +724,13 @@ mod tests {
         {
             let mut db = test_db.local_db();
             let mut allowed_units: AllowedUnits = HashMap::new();
-            allowed_units.insert(AllowedUnitsType::Piece, 1);
+            allowed_units.insert(
+                AllowedUnitsType::Gram,
+                UnitData {
+                    amount: 1,
+                    divider: 1,
+                },
+            );
             let product = Product::new(
                 "Persisted".to_string(),
                 Some("BrandP".to_string()),
@@ -861,8 +901,20 @@ mod tests {
 
     fn seed_products(db: &mut LocalProductDb) -> Result<(), String> {
         let mut apple_allowed: AllowedUnits = HashMap::new();
-        apple_allowed.insert(AllowedUnitsType::Piece, 1);
-        apple_allowed.insert(AllowedUnitsType::Cup, 1);
+        apple_allowed.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 1,
+                divider: 1,
+            },
+        );
+        apple_allowed.insert(
+            AllowedUnitsType::Cup,
+            UnitData {
+                amount: 1,
+                divider: 2,
+            },
+        );
         let mut apple_micro = Box::new(MicroNutrients::default());
         apple_micro[MicroNutrientsType::Fiber] = Some(2.4_f32);
         apple_micro[MicroNutrientsType::Zinc] = Some(0.1_f32);
@@ -881,9 +933,27 @@ mod tests {
             .map_err(|e| format!("Failed to seed product {apple_id}: {e}"))?;
 
         let mut banana_allowed: AllowedUnits = HashMap::new();
-        banana_allowed.insert(AllowedUnitsType::Piece, 1);
-        banana_allowed.insert(AllowedUnitsType::Tablespoon, 2);
-        banana_allowed.insert(AllowedUnitsType::Custom, 50);
+        banana_allowed.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 1,
+                divider: 1,
+            },
+        );
+        banana_allowed.insert(
+            AllowedUnitsType::Tablespoon,
+            UnitData {
+                amount: 2,
+                divider: 1,
+            },
+        );
+        banana_allowed.insert(
+            AllowedUnitsType::Custom,
+            UnitData {
+                amount: 50,
+                divider: 1,
+            },
+        );
         let mut banana_micro = Box::new(MicroNutrients::default());
         banana_micro[MicroNutrientsType::Fiber] = Some(2.6_f32);
         banana_micro[MicroNutrientsType::Sodium] = Some(1.0_f32);
@@ -954,14 +1024,22 @@ mod tests {
             apple.micro_nutrients[MicroNutrientsType::Fiber],
             Some(2.4_f32)
         );
-        assert_eq!(apple.allowed_units[&AllowedUnitsType::Piece], 1);
+        assert_eq!(apple.allowed_units[&AllowedUnitsType::Cup].amount, 1);
+        assert_eq!(apple.allowed_units[&AllowedUnitsType::Cup].divider, 2);
     }
 
     #[test]
     fn test_04_set_product_unit_updates_allowed_units_table() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
-        let result = db.set_product_unit("Apple (BrandA)", AllowedUnitsType::Cup, 3);
+        let result = db.set_product_unit(
+            "Apple (BrandA)",
+            AllowedUnitsType::Cup,
+            UnitData {
+                amount: 3,
+                divider: 2,
+            },
+        );
         assert!(result.is_ok());
         let conn = test_db.connection();
         let updated: Option<u16> = conn
@@ -972,6 +1050,14 @@ mod tests {
             )
             .expect("Failed to fetch updated unit");
         assert_eq!(updated, Some(3));
+        let updated2: Option<u16> = conn
+            .query_row(
+                "SELECT \"cup divider\" FROM allowed_units WHERE id = ?1;",
+                params!["Apple (BrandA)"],
+                |row| row.get(0),
+            )
+            .expect("Failed to fetch updated unit");
+        assert_eq!(updated2, Some(2));
     }
 
     #[test]
@@ -979,8 +1065,20 @@ mod tests {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         let mut allowed_units: AllowedUnits = HashMap::new();
-        allowed_units.insert(AllowedUnitsType::Piece, 1);
-        allowed_units.insert(AllowedUnitsType::Cup, 2);
+        allowed_units.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 1,
+                divider: 1,
+            },
+        );
+        allowed_units.insert(
+            AllowedUnitsType::Cup,
+            UnitData {
+                amount: 2,
+                divider: 1,
+            },
+        );
         let new_product = Product::new(
             "Orange".to_string(),
             Some("CitrusCo".to_string()),
@@ -1011,8 +1109,20 @@ mod tests {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         let mut allowed_units: AllowedUnits = HashMap::new();
-        allowed_units.insert(AllowedUnitsType::Piece, 1);
-        allowed_units.insert(AllowedUnitsType::Custom, 250);
+        allowed_units.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 1,
+                divider: 1,
+            },
+        );
+        allowed_units.insert(
+            AllowedUnitsType::Custom,
+            UnitData {
+                amount: 250,
+                divider: 1,
+            },
+        );
         let mut micro = Box::new(MicroNutrients::default());
         micro[MicroNutrientsType::Fiber] = Some(3.0_f32);
         micro[MicroNutrientsType::Zinc] = Some(0.2_f32);

@@ -59,15 +59,27 @@ impl ProductConstraint {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data_types::{MacroElements, MicroNutrients};
+    use crate::data_types::{MacroElements, MicroNutrients, UnitData};
 
     #[test]
     fn test_product_constraint_valid_creation() {
         let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
         let mut allowed_units = std::collections::HashMap::new();
-        allowed_units.insert(AllowedUnitsType::Cup, 250);
-        allowed_units.insert(AllowedUnitsType::Piece, 1);
+        allowed_units.insert(
+            AllowedUnitsType::Cup,
+            UnitData {
+                amount: 250,
+                divider: 1,
+            },
+        );
+        allowed_units.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 1,
+                divider: 1,
+            },
+        );
         let product = Box::new(Product::new(
             "Test Product".to_string(),
             None,
@@ -100,7 +112,13 @@ mod tests {
         let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
         let mut allowed_units = std::collections::HashMap::new();
-        allowed_units.insert(AllowedUnitsType::Cup, 250);
+        allowed_units.insert(
+            AllowedUnitsType::Cup,
+            UnitData {
+                amount: 250,
+                divider: 1,
+            },
+        );
         let product = Box::new(Product::new(
             "Test Product".to_string(),
             None,
@@ -117,8 +135,20 @@ mod tests {
         let macro_elements1 = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients1 = Box::new(MicroNutrients::default());
         let mut allowed_units1 = std::collections::HashMap::new();
-        allowed_units1.insert(AllowedUnitsType::Cup, 250);
-        allowed_units1.insert(AllowedUnitsType::Piece, 1);
+        allowed_units1.insert(
+            AllowedUnitsType::Cup,
+            UnitData {
+                amount: 250,
+                divider: 1,
+            },
+        );
+        allowed_units1.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 1,
+                divider: 1,
+            },
+        );
         let product1 = Box::new(Product::new(
             "Product 1".to_string(),
             None,
@@ -132,7 +162,13 @@ mod tests {
         let macro_elements2 = Box::new(MacroElements::new(10.0, 20.0, 30.0, 40.0, 50.0));
         let micro_nutrients2 = Box::new(MicroNutrients::default());
         let mut allowed_units2 = std::collections::HashMap::new();
-        allowed_units2.insert(AllowedUnitsType::Piece, 1);
+        allowed_units2.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 1,
+                divider: 1,
+            },
+        );
         let product2 = Box::new(Product::new(
             "Product 2".to_string(),
             None,
@@ -141,14 +177,14 @@ mod tests {
             allowed_units2,
         ));
         let constraint2 =
-            ProductConstraint::new(product2, Some(2), Some(10), AllowedUnitsType::Piece).unwrap();
+            ProductConstraint::new(product2, Some(2), Some(10), AllowedUnitsType::Gram).unwrap();
 
         constraint1.update(constraint2);
 
         assert_eq!(constraint1.food().name(), "Product 2");
         assert_eq!(constraint1.low_bound(), Some(2));
         assert_eq!(constraint1.up_bound(), Some(10));
-        assert_eq!(constraint1.unit(), AllowedUnitsType::Piece);
+        assert_eq!(constraint1.unit(), AllowedUnitsType::Gram);
     }
 
     #[test]
@@ -156,7 +192,13 @@ mod tests {
         let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
         let mut allowed_units = std::collections::HashMap::new();
-        allowed_units.insert(AllowedUnitsType::Cup, 250);
+        allowed_units.insert(
+            AllowedUnitsType::Cup,
+            UnitData {
+                amount: 250,
+                divider: 1,
+            },
+        );
         let product = Box::new(Product::new(
             "Test Product".to_string(),
             None,
@@ -176,7 +218,13 @@ mod tests {
         let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
         let micro_nutrients = Box::new(MicroNutrients::default());
         let mut allowed_units = std::collections::HashMap::new();
-        allowed_units.insert(AllowedUnitsType::Cup, 250);
+        allowed_units.insert(
+            AllowedUnitsType::Cup,
+            UnitData {
+                amount: 250,
+                divider: 1,
+            },
+        );
         let product = Box::new(Product::new(
             "Test Product".to_string(),
             None,
