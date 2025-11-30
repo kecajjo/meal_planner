@@ -129,7 +129,7 @@ impl MutableDbWrapper for MockProductDb {
 
     fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         if !self.products.contains_key(product_id) {
-            return Err(format!("Product with ID '{}' not found.", product_id));
+            return Err(format!("Product with ID '{product_id}' not found."));
         }
         self.add_or_modify_product(product);
         Ok(())
@@ -139,7 +139,7 @@ impl MutableDbWrapper for MockProductDb {
         if self.products.remove(product_id).is_some() {
             Ok(())
         } else {
-            Err(format!("Product with ID '{}' not found.", product_id))
+            Err(format!("Product with ID '{product_id}' not found."))
         }
     }
 }
@@ -157,7 +157,7 @@ impl DbWrapper for MockProductDb {
 
         let mut results = HashMap::new();
 
-        for (name, product) in self.products.iter() {
+        for (name, product) in &self.products {
             if criteria
                 .iter()
                 .all(|crit| is_prod_matching_crit(product, crit))
@@ -178,7 +178,7 @@ impl DbWrapper for MockProductDb {
         let product = self
             .products
             .get_mut(product_id)
-            .ok_or_else(|| format!("Product with ID '{}' not found.", product_id))?;
+            .ok_or_else(|| format!("Product with ID '{product_id}' not found."))?;
         product.allowed_units.insert(allowed_unit, quantity);
         Ok(())
     }

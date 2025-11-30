@@ -22,7 +22,7 @@ impl fmt::Display for MicroNutrientsType {
             MicroNutrientsType::Sodium => "Sodium",
             MicroNutrientsType::Alcohol => "Alcohol",
         };
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
 }
 

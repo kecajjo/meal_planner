@@ -2,7 +2,7 @@ use core::fmt;
 use std::hash::Hash;
 use strum_macros::{EnumCount, EnumIter};
 
-use super::{macro_elements::*, micro_nutrients::*};
+use super::{macro_elements::MacroElements, micro_nutrients::MicroNutrients};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter, EnumCount)]
 pub enum AllowedUnitsType {
@@ -24,7 +24,7 @@ impl fmt::Display for AllowedUnitsType {
             AllowedUnitsType::Box => "box",
             AllowedUnitsType::Custom => "custom",
         };
-        write!(f, "{}", unit_str)
+        write!(f, "{unit_str}")
     }
 }
 
@@ -41,6 +41,7 @@ pub struct Product {
 }
 
 impl Product {
+    #[must_use]
     pub fn new(
         name: String,
         brand: Option<String>,
@@ -60,10 +61,12 @@ impl Product {
         }
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn brand(&self) -> Option<&str> {
         self.brand.as_deref()
     }
@@ -79,6 +82,7 @@ impl Product {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::data_types::{MacroElementsType, MicroNutrientsType};
 
     #[test]
     fn test_product_new_and_accessors() {

@@ -7,6 +7,7 @@ use super::local_db;
 #[cfg(test)]
 use super::mock_db;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataBaseTypes {
     #[cfg(test)]
     Mock,
@@ -64,7 +65,7 @@ pub trait DbWrapper {
     ) -> Result<(), String> {
         let mut dest_prod = self
             .get_product_by_id(target_product_id)
-            .ok_or_else(|| format!("Product with ID '{}' not found.", target_product_id))?;
+            .ok_or_else(|| format!("Product with ID '{target_product_id}' not found."))?;
         dest_prod.allowed_units = source_units.clone();
         self.update_product_units(target_product_id, &dest_prod.allowed_units)?;
         Ok(())
@@ -129,7 +130,7 @@ mod dbwrapper_trait_default_impl_tests {
             if self.products.contains_key(product_id) {
                 Ok(())
             } else {
-                Err(format!("Product with ID '{}' not found.", product_id))
+                Err(format!("Product with ID '{product_id}' not found."))
             }
         }
     }
@@ -137,7 +138,7 @@ mod dbwrapper_trait_default_impl_tests {
     fn make_product(name: &str, brand: Option<&str>) -> Product {
         Product::new(
             name.to_string(),
-            brand.map(|b| b.to_string()),
+            brand.map(std::string::ToString::to_string),
             Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0)),
             Box::default(),
             {

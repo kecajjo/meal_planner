@@ -1,4 +1,4 @@
-use crate::data_types::*;
+use crate::data_types::{AllowedUnitsType, Product};
 
 pub type AllowedUnitDividers = std::collections::HashMap<AllowedUnitsType, u16>;
 
@@ -12,6 +12,7 @@ pub struct ProductConstraint {
 }
 
 impl ProductConstraint {
+    #[must_use]
     pub fn new(
         food: Box<Product>,
         low_bound: Option<u16>,
@@ -34,15 +35,19 @@ impl ProductConstraint {
         })
     }
 
+    #[must_use]
     pub fn food(&self) -> &Product {
         &self.food
     }
+    #[must_use]
     pub fn low_bound(&self) -> Option<u16> {
         self.low_bound
     }
+    #[must_use]
     pub fn up_bound(&self) -> Option<u16> {
         self.up_bound
     }
+    #[must_use]
     pub fn unit(&self) -> AllowedUnitsType {
         self.unit
     }
@@ -54,6 +59,7 @@ impl ProductConstraint {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::data_types::{MacroElements, MicroNutrients};
 
     #[test]
     fn test_product_constraint_valid_creation() {

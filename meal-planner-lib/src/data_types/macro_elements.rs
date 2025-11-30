@@ -26,7 +26,7 @@ impl fmt::Display for MacroElementsType {
             MacroElementsType::Protein => "Protein",
             MacroElementsType::Calories => "Calories",
         };
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
 }
 
@@ -37,6 +37,7 @@ pub struct MacroElements {
 }
 
 impl MacroElements {
+    #[must_use]
     pub fn new(fat: f32, saturated_fat: f32, carbs: f32, sugar: f32, protein: f32) -> Self {
         let mut elements = std::collections::HashMap::new();
         for elem in MacroElementsType::iter() {
@@ -67,17 +68,17 @@ impl MacroElements {
     }
 
     pub fn set(&mut self, key: MacroElementsType, value: f32) -> Result<(), String> {
-        match key {
-            MacroElementsType::Calories => Err("Cannot set calories directly".to_string()),
-            _ => {
-                self.elements.insert(key, value);
-                Ok(())
-            }
+        if key == MacroElementsType::Calories {
+            Err("Cannot set calories directly".to_string())
+        } else {
+            self.elements.insert(key, value);
+            Ok(())
         }?;
         self.recompute_calories();
         Ok(())
     }
 
+    #[must_use]
     pub fn add_ref(lhs: &MacroElements, rhs: &MacroElements) -> MacroElements {
         let mut elements = std::collections::HashMap::new();
         for elem in MacroElementsType::iter() {

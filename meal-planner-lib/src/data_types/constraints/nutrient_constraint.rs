@@ -1,4 +1,4 @@
-use crate::data_types::*;
+use crate::data_types::{MacroElementsType, MicroNutrientsType};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NutrientType {
@@ -55,14 +55,17 @@ impl NutrientConstraint {
         })
     }
 
+    #[must_use] 
     pub fn element(&self) -> NutrientType {
         self.element
     }
 
+    #[must_use] 
     pub fn min(&self) -> Option<f32> {
         self.min
     }
 
+    #[must_use] 
     pub fn max(&self) -> Option<f32> {
         self.max
     }

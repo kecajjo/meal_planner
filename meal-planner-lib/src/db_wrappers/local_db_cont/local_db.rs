@@ -37,7 +37,7 @@ impl fmt::Display for SqlTablesNames {
             SqlTablesNames::MicroNutrients => "micronutrients",
             SqlTablesNames::AllowedUnits => "allowed_units",
         };
-        write!(f, "{}", table_name)
+        write!(f, "{table_name}")
     }
 }
 
@@ -69,7 +69,7 @@ impl LocalProductDb {
     fn _update_table_columns(&self, table_name: SqlTablesNames) -> Result<(), String> {
         let (all_columns, col_type) = match table_name {
             t @ (SqlTablesNames::Products | SqlTablesNames::MacroElements) => {
-                return Err(format!("{} table should have all necessary columns", t));
+                return Err(format!("{t} table should have all necessary columns"));
             }
             SqlTablesNames::MicroNutrients => (
                 MicroNutrientsType::iter()
@@ -87,8 +87,8 @@ impl LocalProductDb {
 
         let mut stmt = self
             .sqlite_con
-            .prepare(format!("SELECT name FROM pragma_table_info('{}')", table_name).as_str())
-            .unwrap_or_else(|_| panic!("Getting columns names of the {} table failed", table_name));
+            .prepare(format!("SELECT name FROM pragma_table_info('{table_name}')").as_str())
+            .unwrap_or_else(|_| panic!("Getting columns names of the {table_name} table failed"));
 
         let db_column_iter = stmt
             .query_map([], |row| row.get::<_, String>(0))
@@ -107,17 +107,12 @@ impl LocalProductDb {
         }
 
         for col in missing_columns {
-            let alter_table_query = format!(
-                "ALTER TABLE {} ADD COLUMN \"{}\" {};",
-                table_name, col, col_type
-            );
+            let alter_table_query =
+                format!("ALTER TABLE {table_name} ADD COLUMN \"{col}\" {col_type};");
             self.sqlite_con
                 .execute(alter_table_query.as_str(), [])
                 .map_err(|e| {
-                    format!(
-                        "Failed to add column '{}' to table '{}': {}",
-                        col, table_name, e
-                    )
+                    format!("Failed to add column '{col}' to table '{table_name}': {e}")
                 })?;
         }
 
@@ -142,9 +137,9 @@ impl LocalProductDb {
 
         let macro_elem_to_text = |x: MacroElementsType| {
             if MacroElementsType::Calories == x {
-                "".to_string()
+                String::new()
             } else {
-                format!("\"{}\" FLOAT NOT NULL,\n", x)
+                format!("\"{x}\" FLOAT NOT NULL,\n")
             }
         };
         let macro_elements_fields: String =
@@ -156,7 +151,7 @@ impl LocalProductDb {
         )
         .unwrap_or_else(|_| panic!("Failed to create '{}' table", SqlTablesNames::MacroElements));
 
-        let micronutrients_to_text = |x: MicroNutrientsType| format!("\"{}\" FLOAT,\n", x);
+        let micronutrients_to_text = |x: MicroNutrientsType| format!("\"{x}\" FLOAT,\n");
         let micronutrients_fields: String = MicroNutrientsType::iter()
             .map(micronutrients_to_text)
             .collect();
@@ -173,8 +168,8 @@ impl LocalProductDb {
         });
 
         let allowed_units_to_text = |x: AllowedUnitsType| match x {
-            AllowedUnitsType::Piece => format!("\"{}\" INTEGER NOT NULL DEFAULT 1,\n", x),
-            _ => format!("\"{}\" INTEGER,\n", x),
+            AllowedUnitsType::Piece => format!("\"{x}\" INTEGER NOT NULL DEFAULT 1,\n"),
+            _ => format!("\"{x}\" INTEGER,\n"),
         };
         let allowed_units_fields: String = AllowedUnitsType::iter()
             .map(allowed_units_to_text)
@@ -206,7 +201,7 @@ impl LocalProductDb {
                 ),
                 [],
             )
-            .map_err(|e| format!("Failed to create '{}' table: {}", table_name, e))?;
+            .map_err(|e| format!("Failed to create '{table_name}' table: {e}"))?;
         Ok(())
     }
 }
@@ -309,7 +304,7 @@ impl DbWrapper for LocalProductDb {
         let mut append_columns =
             |table: SqlTablesNames, iter: &mut dyn Iterator<Item = Option<String>>| {
                 for col in iter.flatten() {
-                    query_template.push_str(&format!(", {}.\"{}\"", table, col));
+                    query_template.push_str(&format!(", {table}.\"{col}\""));
                 }
             };
 
@@ -381,8 +376,7 @@ impl DbWrapper for LocalProductDb {
             .execute(update_query.as_str(), [])
             .map_err(|e| {
                 format!(
-                    "Failed to update allowed unit {} for product {}: {}",
-                    allowed_unit, product_id, e
+                    "Failed to update allowed unit {allowed_unit} for product {product_id}: {e}"
                 )
             })?;
         Ok(())
@@ -391,24 +385,20 @@ impl DbWrapper for LocalProductDb {
 
 impl MutableDbWrapper for LocalProductDb {
     fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
-        let run_query =
-            |table_name: &str, columns_str: &str, values_str: &str| -> Result<(), String> {
-                self.sqlite_con
-                    .execute(
-                        &format!(
-                            "INSERT INTO {} ({}) VALUES ({});",
-                            table_name, columns_str, values_str
-                        ),
-                        [],
-                    )
-                    .map_err(|e| {
-                        format!(
-                            "Failed to insert product '{}' into {} table: {}",
-                            product_id, table_name, e
-                        )
-                    })?;
-                Ok(())
-            };
+        let run_query = |table_name: &str,
+                         columns_str: &str,
+                         values_str: &str|
+         -> Result<(), String> {
+            self.sqlite_con
+                .execute(
+                    &format!("INSERT INTO {table_name} ({columns_str}) VALUES ({values_str});"),
+                    [],
+                )
+                .map_err(|e| {
+                    format!("Failed to insert product '{product_id}' into {table_name} table: {e}")
+                })?;
+            Ok(())
+        };
 
         run_query(
             &SqlTablesNames::Products.to_string(),
@@ -418,7 +408,7 @@ impl MutableDbWrapper for LocalProductDb {
                 product_id,
                 product.name(),
                 match product.brand() {
-                    Some(brand) => format!("'{}'", brand),
+                    Some(brand) => format!("'{brand}'"),
                     None => "NULL".to_string(),
                 }
             )
@@ -429,14 +419,14 @@ impl MutableDbWrapper for LocalProductDb {
             ($it:expr, MacroElements, columns) => {
                 $it.filter_map(|x| match x {
                     MacroElementsType::Calories => None,
-                    _ => Some(format!("\"{}\", ", x)),
+                    _ => Some(format!("\"{x}\", ")),
                 })
             };
             ($it:expr, MicroNutrients, columns) => {
-                $it.map(|x| format!("\"{}\", ", x))
+                $it.map(|x| format!("\"{x}\", "))
             };
             ($it:expr, AllowedUnits, columns) => {
-                $it.map(|x| format!("\"{}\", ", x))
+                $it.map(|x| format!("\"{x}\", "))
             };
             ($it:expr, MacroElements, values) => {
                 $it.filter_map(|x| match x {
@@ -486,7 +476,7 @@ impl MutableDbWrapper for LocalProductDb {
 
                 run_query(
                     $sql_table_var.to_string().as_str(),
-                    format!("id, {}", col_names).as_str(),
+                    format!("id, {col_names}").as_str(),
                     format!("'{}', {}", product.id(), values).as_str(),
                 )?;
             };
@@ -515,19 +505,10 @@ impl MutableDbWrapper for LocalProductDb {
         let run_query = |table: &str, col: &str, val: &str| {
             self.sqlite_con
                 .execute(
-                    &format!(
-                        "UPDATE {} SET \"{}\" = {} where id = '{}';",
-                        table, col, val, product_id
-                    ),
+                    &format!("UPDATE {table} SET \"{col}\" = {val} where id = '{product_id}';"),
                     [],
                 )
-                .unwrap_or_else(|_| {
-                    panic!(
-                        "Failed to update {col} for {id}",
-                        col = col,
-                        id = product_id
-                    )
-                });
+                .unwrap_or_else(|_| panic!("Failed to update {col} for {product_id}"));
         };
 
         for (col, val) in [
@@ -535,7 +516,7 @@ impl MutableDbWrapper for LocalProductDb {
             (
                 "brand",
                 match product.brand() {
-                    Some(brand) => format!("'{}'", brand),
+                    Some(brand) => format!("'{brand}'"),
                     None => "NULL".to_string(),
                 },
             ),
@@ -589,16 +570,14 @@ impl MutableDbWrapper for LocalProductDb {
         self.sqlite_con
             .execute(
                 format!(
-                    "DELETE FROM {} WHERE id = '{}';",
-                    main_table_name, product_id
+                    "DELETE FROM {main_table_name} WHERE id = '{product_id}';"
                 )
                 .as_str(),
                 [],
             )
             .map_err(|e| {
                 format!(
-                    "Failed to delete product with ID '{}' from table '{}': {}",
-                    product_id, main_table_name, e
+                    "Failed to delete product with ID '{product_id}' from table '{main_table_name}': {e}"
                 )
             })?;
         Ok(())
@@ -630,10 +609,10 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("Failed to check table existence");
-        assert!(count > 0, "Expected '{}' table to exist", table);
+        assert!(count > 0, "Expected '{table}' table to exist");
 
         let mut stmt = connection
-            .prepare(&format!("SELECT name FROM pragma_table_info('{}');", table))
+            .prepare(&format!("SELECT name FROM pragma_table_info('{table}');"))
             .expect("Failed to prepare pragma_table_info statement");
         let columns: Vec<String> = stmt
             .query_map([], |row| row.get::<_, String>(0))
@@ -643,8 +622,7 @@ mod tests {
 
         assert_eq!(
             columns, expected_columns,
-            "Unexpected columns for table '{}'",
-            table
+            "Unexpected columns for table '{table}'"
         );
     }
 
@@ -726,8 +704,7 @@ mod tests {
         let key = "Persisted (BrandP)";
         assert!(
             results.contains_key(key),
-            "Expected previously inserted product '{}' to remain after reopening",
-            key
+            "Expected previously inserted product '{key}' to remain after reopening"
         );
     }
 
@@ -790,7 +767,7 @@ mod tests {
 
         let attempt_remove = |candidate: &Path| -> Result<(), String> {
             match fs::remove_file(candidate) {
-                Ok(_) => Ok(()),
+                Ok(()) => Ok(()),
                 Err(err) if err.kind() == ErrorKind::NotFound => Ok(()),
                 Err(err) => Err(err.to_string()),
             }
@@ -810,7 +787,7 @@ mod tests {
         static INIT_CLEANUP: Once = Once::new();
         INIT_CLEANUP.call_once(|| {
             if let Err(err) = cleanup_previous_test_databases() {
-                panic!("Failed to cleanup previous test databases: {}", err);
+                panic!("Failed to cleanup previous test databases: {err}");
             }
         });
 
@@ -819,14 +796,14 @@ mod tests {
 
         let base_path = Path::new(DATABASE_FILENAME);
         let parent = base_path.parent();
-        let stem = base_path
-            .file_stem()
-            .map(|s| s.to_string_lossy().into_owned())
-            .unwrap_or_else(|| "test_db".to_string());
+        let stem = base_path.file_stem().map_or_else(
+            || "test_db".to_string(),
+            |s| s.to_string_lossy().into_owned(),
+        );
         let filename = if let Some(ext) = base_path.extension() {
             format!("{}_{}.{}", stem, suffix, ext.to_string_lossy())
         } else {
-            format!("{}_{}", stem, suffix)
+            format!("{stem}_{suffix}")
         };
 
         match parent {
@@ -844,11 +821,11 @@ mod tests {
             .file_stem()
             .and_then(|s| s.to_str())
             .ok_or_else(|| "DATABASE_FILENAME stem is not valid UTF-8".to_string())?;
-        let prefix = format!("{}_", stem);
+        let prefix = format!("{stem}_");
         let extension = base_path
             .extension()
             .and_then(|e| e.to_str())
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
 
         let entries = fs::read_dir(parent).map_err(|e| e.to_string())?;
         for entry in entries {
@@ -894,7 +871,7 @@ mod tests {
         );
         let apple_id = apple.id();
         db.add_product(apple_id.as_str(), apple)
-            .map_err(|e| format!("Failed to seed product {}: {}", apple_id, e))?;
+            .map_err(|e| format!("Failed to seed product {apple_id}: {e}"))?;
 
         let mut banana_allowed: AllowedUnits = HashMap::new();
         banana_allowed.insert(AllowedUnitsType::Piece, 1);
@@ -914,7 +891,7 @@ mod tests {
         );
         let banana_id = banana.id();
         db.add_product(banana_id.as_str(), banana)
-            .map_err(|e| format!("Failed to seed product {}: {}", banana_id, e))?;
+            .map_err(|e| format!("Failed to seed product {banana_id}: {e}"))?;
 
         Ok(())
     }
