@@ -26,7 +26,7 @@ impl fmt::Display for MacroElementsType {
             MacroElementsType::Protein => "Protein",
             MacroElementsType::Calories => "Calories",
         };
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
 }
 
@@ -37,6 +37,8 @@ pub struct MacroElements {
 }
 
 impl MacroElements {
+    #[allow(clippy::match_wildcard_for_single_variants)]
+    #[must_use]
     pub fn new(fat: f32, saturated_fat: f32, carbs: f32, sugar: f32, protein: f32) -> Self {
         let mut elements = std::collections::HashMap::new();
         for elem in MacroElementsType::iter() {
@@ -67,17 +69,17 @@ impl MacroElements {
     }
 
     pub fn set(&mut self, key: MacroElementsType, value: f32) -> Result<(), String> {
-        match key {
-            MacroElementsType::Calories => Err("Cannot set calories directly".to_string()),
-            _ => {
-                self.elements.insert(key, value);
-                Ok(())
-            }
+        if key == MacroElementsType::Calories {
+            Err("Cannot set calories directly".to_string())
+        } else {
+            self.elements.insert(key, value);
+            Ok(())
         }?;
         self.recompute_calories();
         Ok(())
     }
 
+    #[must_use]
     pub fn add_ref(lhs: &MacroElements, rhs: &MacroElements) -> MacroElements {
         let mut elements = std::collections::HashMap::new();
         for elem in MacroElementsType::iter() {
@@ -132,17 +134,18 @@ impl<'b> Add<&'b MacroElements> for &MacroElements {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use approx::assert_relative_eq;
 
     #[test]
     fn test_macro_elements_new_and_calories() {
         let me = MacroElements::new(10.0, 3.0, 20.0, 5.0, 15.0);
         // calories = (10*9) + (20*4) + (15*4) = 90 + 80 + 60 = 230
-        assert_eq!(me[MacroElementsType::Fat], 10.0);
-        assert_eq!(me[MacroElementsType::SaturatedFat], 3.0);
-        assert_eq!(me[MacroElementsType::Carbs], 20.0);
-        assert_eq!(me[MacroElementsType::Sugar], 5.0);
-        assert_eq!(me[MacroElementsType::Protein], 15.0);
-        assert_eq!(me[MacroElementsType::Calories], 230.0);
+        assert_relative_eq!(me[MacroElementsType::Fat], 10.0);
+        assert_relative_eq!(me[MacroElementsType::SaturatedFat], 3.0);
+        assert_relative_eq!(me[MacroElementsType::Carbs], 20.0);
+        assert_relative_eq!(me[MacroElementsType::Sugar], 5.0);
+        assert_relative_eq!(me[MacroElementsType::Protein], 15.0);
+        assert_relative_eq!(me[MacroElementsType::Calories], 230.0);
     }
 
     #[test]
@@ -151,11 +154,11 @@ mod tests {
         assert!(me.set(MacroElementsType::Fat, 5.0).is_ok());
         assert!(me.set(MacroElementsType::Carbs, 10.0).is_ok());
         assert!(me.set(MacroElementsType::Protein, 8.0).is_ok());
+        assert_relative_eq!(me[MacroElementsType::Fat], 5.0);
+        assert_relative_eq!(me[MacroElementsType::Carbs], 10.0);
+        assert_relative_eq!(me[MacroElementsType::Protein], 8.0);
         // calories = (5*9) + (10*4) + (8*4) = 45 + 40 + 32 = 117
-        assert_eq!(me[MacroElementsType::Fat], 5.0);
-        assert_eq!(me[MacroElementsType::Carbs], 10.0);
-        assert_eq!(me[MacroElementsType::Protein], 8.0);
-        assert_eq!(me[MacroElementsType::Calories], 117.0);
+        assert_relative_eq!(me[MacroElementsType::Calories], 117.0);
     }
 
     #[test]
@@ -167,12 +170,12 @@ mod tests {
     #[test]
     fn test_macro_elements_index() {
         let me = MacroElements::new(2.0, 1.0, 4.0, 1.5, 3.0);
-        assert_eq!(me[MacroElementsType::Fat], 2.0);
-        assert_eq!(me[MacroElementsType::SaturatedFat], 1.0);
-        assert_eq!(me[MacroElementsType::Carbs], 4.0);
-        assert_eq!(me[MacroElementsType::Sugar], 1.5);
-        assert_eq!(me[MacroElementsType::Protein], 3.0);
-        assert_eq!(me[MacroElementsType::Calories], 46.0);
+        assert_relative_eq!(me[MacroElementsType::Fat], 2.0);
+        assert_relative_eq!(me[MacroElementsType::SaturatedFat], 1.0);
+        assert_relative_eq!(me[MacroElementsType::Carbs], 4.0);
+        assert_relative_eq!(me[MacroElementsType::Sugar], 1.5);
+        assert_relative_eq!(me[MacroElementsType::Protein], 3.0);
+        assert_relative_eq!(me[MacroElementsType::Calories], 46.0);
     }
 
     #[test]
@@ -185,10 +188,10 @@ mod tests {
                 continue;
             }
 
-            assert_eq!(sum[elem], (&me1)[elem] + (&me2)[elem]);
+            assert_relative_eq!(sum[elem], (&me1)[elem] + (&me2)[elem]);
         }
         // calories = (3*9)+(6*4)+(4*4) = 27+24+16 = 67
-        assert_eq!(sum[MacroElementsType::Calories], 67.0);
+        assert_relative_eq!(sum[MacroElementsType::Calories], 67.0);
     }
 
     #[test]
@@ -226,10 +229,10 @@ mod tests {
             if elem == MacroElementsType::Calories {
                 continue;
             }
-            assert_eq!(sum[elem], me1[elem] + me2[elem]);
+            assert_relative_eq!(sum[elem], me1[elem] + me2[elem]);
         }
         // calories = (3*9)+(6*4)+(4*4) = 27+24+16 = 67
-        assert_eq!(sum[MacroElementsType::Calories], 67.0);
+        assert_relative_eq!(sum[MacroElementsType::Calories], 67.0);
     }
 
     #[test]
@@ -263,7 +266,7 @@ mod tests {
         let mut seen = std::collections::HashSet::new();
 
         for (elem_type, value) in iter {
-            assert_eq!(value, me[elem_type]);
+            assert_relative_eq!(value, me[elem_type]);
             assert!(seen.insert(elem_type), "Duplicate element in iterator");
         }
         assert_eq!(seen.len(), MacroElementsType::iter().count());

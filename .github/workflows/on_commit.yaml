@@ -24,10 +24,10 @@ jobs:
       - name: Check
         run: cargo check --workspace --all-targets --verbose
       - name: Clippy
-        run: cargo clippy --workspace --all-targets --verbose -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Build
+        run: cargo build --workspace --all-targets
+      - name: Test
+        run: cargo test --workspace --all-targets
       - name: Format
         run: cargo fmt --all -- --check
-      - name: Build
-        run: cargo build --workspace --all-targets --verbose
-      - name: Test
-        run: cargo test --workspace --all-targets --verbose

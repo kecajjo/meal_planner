@@ -2,7 +2,7 @@ use core::fmt;
 use std::hash::Hash;
 use strum_macros::{EnumCount, EnumIter};
 
-use super::{macro_elements::*, micro_nutrients::*};
+use super::{macro_elements::MacroElements, micro_nutrients::MicroNutrients};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter, EnumCount)]
 pub enum AllowedUnitsType {
@@ -24,7 +24,7 @@ impl fmt::Display for AllowedUnitsType {
             AllowedUnitsType::Box => "box",
             AllowedUnitsType::Custom => "custom",
         };
-        write!(f, "{}", unit_str)
+        write!(f, "{unit_str}")
     }
 }
 
@@ -41,6 +41,7 @@ pub struct Product {
 }
 
 impl Product {
+    #[must_use]
     pub fn new(
         name: String,
         brand: Option<String>,
@@ -60,14 +61,17 @@ impl Product {
         }
     }
 
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[must_use]
     pub fn brand(&self) -> Option<&str> {
         self.brand.as_deref()
     }
 
+    #[must_use]
     pub fn id(&self) -> String {
         match &self.brand {
             Some(brand) if !brand.is_empty() => format!("{} ({})", self.name(), brand),
@@ -79,6 +83,8 @@ impl Product {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::data_types::{MacroElementsType, MicroNutrientsType};
+    use approx::assert_relative_eq;
 
     #[test]
     fn test_product_new_and_accessors() {
@@ -97,7 +103,7 @@ mod tests {
         );
         assert_eq!(product.name(), "TestName");
         assert_eq!(product.brand(), Some("TestBrand"));
-        assert_eq!(product.macro_elements[MacroElementsType::Fat], 1.0);
+        assert_relative_eq!(product.macro_elements[MacroElementsType::Fat], 1.0);
         assert_eq!(product.micro_nutrients[MicroNutrientsType::Fiber], None);
         let mut expected_allowed_units = std::collections::HashMap::new();
         expected_allowed_units.insert(AllowedUnitsType::Piece, 123);
@@ -122,7 +128,7 @@ mod tests {
         };
         assert_eq!(product.name, "Test Product");
         assert_eq!(product.brand.as_deref(), Some("Test Brand"));
-        assert_eq!(product.macro_elements[MacroElementsType::Fat], 1.0);
+        assert_relative_eq!(product.macro_elements[MacroElementsType::Fat], 1.0);
         assert_eq!(
             product.micro_nutrients[MicroNutrientsType::Fiber],
             Some(2.5)

@@ -5,3 +5,7 @@ edition = "2024"
 
 [dependencies]
 meal-planner-lib = { path = "../meal-planner-lib" }
+
+[lints.clippy]
+pedantic = {level = "deny", priority = 1}
+float-cmp = {level = "allow", priority = 2}

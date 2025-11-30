@@ -22,7 +22,7 @@ impl fmt::Display for MicroNutrientsType {
             MicroNutrientsType::Sodium => "Sodium",
             MicroNutrientsType::Alcohol => "Alcohol",
         };
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
 }
 
@@ -63,6 +63,13 @@ impl Iterator for MicroNutrientsIter {
 
 pub struct MicroNutrientsIterMut<'a> {
     inner: std::collections::hash_map::IterMut<'a, MicroNutrientsType, Option<f32>>,
+}
+
+impl MicroNutrients {
+    #[allow(dead_code)]
+    fn iter_mut(&mut self) -> MicroNutrientsIterMut<'_> {
+        <&mut Self as IntoIterator>::into_iter(self)
+    }
 }
 
 impl<'a> IntoIterator for &'a mut MicroNutrients {

@@ -129,7 +129,7 @@ impl MutableDbWrapper for MockProductDb {
 
     fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         if !self.products.contains_key(product_id) {
-            return Err(format!("Product with ID '{}' not found.", product_id));
+            return Err(format!("Product with ID '{product_id}' not found."));
         }
         self.add_or_modify_product(product);
         Ok(())
@@ -139,7 +139,7 @@ impl MutableDbWrapper for MockProductDb {
         if self.products.remove(product_id).is_some() {
             Ok(())
         } else {
-            Err(format!("Product with ID '{}' not found.", product_id))
+            Err(format!("Product with ID '{product_id}' not found."))
         }
     }
 }
@@ -157,7 +157,7 @@ impl DbWrapper for MockProductDb {
 
         let mut results = HashMap::new();
 
-        for (name, product) in self.products.iter() {
+        for (name, product) in &self.products {
             if criteria
                 .iter()
                 .all(|crit| is_prod_matching_crit(product, crit))
@@ -178,7 +178,7 @@ impl DbWrapper for MockProductDb {
         let product = self
             .products
             .get_mut(product_id)
-            .ok_or_else(|| format!("Product with ID '{}' not found.", product_id))?;
+            .ok_or_else(|| format!("Product with ID '{product_id}' not found."))?;
         product.allowed_units.insert(allowed_unit, quantity);
         Ok(())
     }
@@ -190,6 +190,8 @@ mod tests {
 
     use super::*;
     use crate::data_types::{MacroElements, Product};
+    use crate::db_wrappers::DbSearchCriteria;
+    use approx::assert_relative_eq;
 
     #[test]
     fn test_new_and_sample_products() {
@@ -231,6 +233,7 @@ mod tests {
 
     #[test]
     fn test_update_product() {
+        use crate::data_types::MacroElementsType;
         let mut db = MockProductDb::new();
         let key = "Apple (BrandedApple)";
         let mut product = db.products[key].clone();
@@ -241,24 +244,23 @@ mod tests {
                 .is_ok()
         );
         let updated = &db.products[key].macro_elements;
-        use crate::data_types::MacroElementsType;
-        assert_eq!(
+        assert_relative_eq!(
             updated[MacroElementsType::Fat],
             new_macros[MacroElementsType::Fat]
         );
-        assert_eq!(
+        assert_relative_eq!(
             updated[MacroElementsType::SaturatedFat],
             new_macros[MacroElementsType::SaturatedFat]
         );
-        assert_eq!(
+        assert_relative_eq!(
             updated[MacroElementsType::Carbs],
             new_macros[MacroElementsType::Carbs]
         );
-        assert_eq!(
+        assert_relative_eq!(
             updated[MacroElementsType::Sugar],
             new_macros[MacroElementsType::Sugar]
         );
-        assert_eq!(
+        assert_relative_eq!(
             updated[MacroElementsType::Protein],
             new_macros[MacroElementsType::Protein]
         );
@@ -267,7 +269,6 @@ mod tests {
     #[test]
     fn test_get_products_matching_criteria_by_name() {
         let db = MockProductDb::new();
-        use crate::db_wrappers::DbSearchCriteria;
         let crit = vec![DbSearchCriteria::ById("App".to_string())];
         let results = db.get_products_matching_criteria(&crit);
         assert_eq!(results.len(), 1);
@@ -296,7 +297,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            format!("Product with ID '{}' not found.", product_id)
+            format!("Product with ID '{product_id}' not found.")
         );
     }
 }
