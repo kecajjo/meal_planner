@@ -1,7 +1,7 @@
 use core::panic;
 use std::collections::HashMap;
 
-use crate::data_types::Product;
+use crate::data_types::{Product, UnitData};
 
 use super::local_db;
 #[cfg(test)]
@@ -44,7 +44,7 @@ pub trait DbWrapper {
         &mut self,
         product_id: &str,
         allowed_unit: crate::data_types::AllowedUnitsType,
-        quantity: u16,
+        unit_data: UnitData,
     ) -> Result<(), String>;
 
     fn update_product_units(
@@ -96,7 +96,7 @@ mod dbwrapper_trait_default_impl_tests {
 
     struct DummyDb {
         pub products: HashMap<String, Product>,
-        pub set_calls: std::cell::RefCell<Vec<(String, AllowedUnitsType, u16)>>,
+        pub set_calls: std::cell::RefCell<Vec<(String, AllowedUnitsType, u16, u16)>>,
     }
 
     impl DbWrapper for DummyDb {
@@ -122,11 +122,14 @@ mod dbwrapper_trait_default_impl_tests {
             &mut self,
             product_id: &str,
             allowed_unit: AllowedUnitsType,
-            quantity: u16,
+            unit_data: UnitData,
         ) -> Result<(), String> {
-            self.set_calls
-                .borrow_mut()
-                .push((product_id.to_string(), allowed_unit, quantity));
+            self.set_calls.borrow_mut().push((
+                product_id.to_string(),
+                allowed_unit,
+                unit_data.amount,
+                unit_data.divider,
+            ));
             if self.products.contains_key(product_id) {
                 Ok(())
             } else {
@@ -143,7 +146,13 @@ mod dbwrapper_trait_default_impl_tests {
             Box::default(),
             {
                 let mut map = HashMap::new();
-                map.insert(AllowedUnitsType::Piece, 1);
+                map.insert(
+                    AllowedUnitsType::Gram,
+                    UnitData {
+                        amount: 1,
+                        divider: 1,
+                    },
+                );
                 map
             },
         )
@@ -163,7 +172,7 @@ mod dbwrapper_trait_default_impl_tests {
         let calls = db.set_calls.borrow();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].0, "Apple (BrandA)");
-        assert_eq!(calls[0].1, AllowedUnitsType::Piece);
+        assert_eq!(calls[0].1, AllowedUnitsType::Gram);
         assert_eq!(calls[0].2, 1);
     }
 
@@ -171,7 +180,13 @@ mod dbwrapper_trait_default_impl_tests {
     fn test_clone_product_units_default_impl_success() {
         let mut products = HashMap::new();
         let mut source = make_product("Apple", Some("BrandA"));
-        source.allowed_units.insert(AllowedUnitsType::Box, 5);
+        source.allowed_units.insert(
+            AllowedUnitsType::Box,
+            UnitData {
+                amount: 5,
+                divider: 1,
+            },
+        );
         let target = make_product("Banana", Some("BrandB"));
         products.insert("Apple (BrandA)".to_string(), source.clone());
         products.insert("Banana (BrandB)".to_string(), target.clone());
@@ -183,12 +198,22 @@ mod dbwrapper_trait_default_impl_tests {
         assert!(result.is_ok());
         // Should have called set_product_unit for each allowed_unit in source
         let calls = db.set_calls.borrow();
-        assert!(calls.iter().any(|(id, unit, qty)| id == "Banana (BrandB)"
-            && *unit == AllowedUnitsType::Piece
-            && *qty == 1));
-        assert!(calls.iter().any(|(id, unit, qty)| id == "Banana (BrandB)"
-            && *unit == AllowedUnitsType::Box
-            && *qty == 5));
+        assert!(
+            calls
+                .iter()
+                .any(|(id, unit, amount, divider)| id == "Banana (BrandB)"
+                    && *unit == AllowedUnitsType::Gram
+                    && *amount == 1
+                    && *divider == 1)
+        );
+        assert!(
+            calls
+                .iter()
+                .any(|(id, unit, amount, divider)| id == "Banana (BrandB)"
+                    && *unit == AllowedUnitsType::Box
+                    && *amount == 5
+                    && *divider == 1)
+        );
     }
 
     #[test]

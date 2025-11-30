@@ -1,10 +1,4 @@
-use crate::data_types::{MacroElementsType, MicroNutrientsType};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NutrientType {
-    Macro(MacroElementsType),
-    Micro(MicroNutrientsType),
-}
+use crate::data_types::{MacroElementsType, MicroNutrientsType, NutrientType};
 
 // Constraint on a nutritional element (macro or micro)
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -12,7 +12,8 @@ mod tests {
     use super::super::*;
     use super::*;
     use crate::data_types::{
-        AllowedUnitsType, MacroElements, MacroElementsType, MicroNutrients, Product,
+        AllowedUnitsType, MacroElements, MacroElementsType, MicroNutrients, NutrientType, Product,
+        UnitData,
     };
 
     fn initialize_meal_with_products() -> MealConstraint {
@@ -29,14 +30,44 @@ mod tests {
             Box::new(MicroNutrients::default()),
         ];
         let mut grams1 = std::collections::HashMap::new();
-        grams1.insert(AllowedUnitsType::Cup, 200);
-        grams1.insert(AllowedUnitsType::Piece, 150);
+        grams1.insert(
+            AllowedUnitsType::Cup,
+            UnitData {
+                amount: 200,
+                divider: 1,
+            },
+        );
+        grams1.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 150,
+                divider: 1,
+            },
+        );
         let mut grams2 = std::collections::HashMap::new();
-        grams2.insert(AllowedUnitsType::Tablespoon, 10);
+        grams2.insert(
+            AllowedUnitsType::Tablespoon,
+            UnitData {
+                amount: 10,
+                divider: 1,
+            },
+        );
         let mut grams3 = std::collections::HashMap::new();
-        grams3.insert(AllowedUnitsType::Piece, 100);
+        grams3.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 100,
+                divider: 1,
+            },
+        );
         let mut grams4 = std::collections::HashMap::new();
-        grams4.insert(AllowedUnitsType::Piece, 50);
+        grams4.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 50,
+                divider: 1,
+            },
+        );
         let prod1 = Box::new(Product::new(
             "Apple".to_string(),
             None,
@@ -69,7 +100,7 @@ mod tests {
         let pc1 = ProductConstraint::new(prod1, Some(1), Some(2), AllowedUnitsType::Cup);
         let pc2 = ProductConstraint::new(prod2, Some(2), Some(3), AllowedUnitsType::Tablespoon);
         let pc3 = ProductConstraint::new(prod3, Some(3), Some(4), AllowedUnitsType::Custom);
-        let pc4 = ProductConstraint::new(prod4, Some(3), Some(4), AllowedUnitsType::Piece);
+        let pc4 = ProductConstraint::new(prod4, Some(3), Some(4), AllowedUnitsType::Gram);
         let mut products = Vec::new();
         products.push(pc1.unwrap());
         products.push(pc2.unwrap());

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::db_wrapper::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
-use crate::data_types::{MacroElements, MicroNutrients, MicroNutrientsType, Product};
+use crate::data_types::{MacroElements, MicroNutrients, MicroNutrientsType, Product, UnitData};
 
 pub struct MockProductDb {
     pub products: HashMap<String, Product>,
@@ -16,6 +16,7 @@ impl MockProductDb {
         me
     }
 
+    #[allow(clippy::too_many_lines)]
     fn create_sample_products(&mut self) {
         let macro_elements = [
             Box::new(MacroElements::new(1.0, 0.5, 2.0, 0.5, 3.0)),
@@ -46,35 +47,89 @@ impl MockProductDb {
         let mut allowed_units = vec![
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::AllowedUnitsType::Piece, 150);
-                map.insert(crate::data_types::AllowedUnitsType::Box, 50);
+                map.insert(
+                    crate::data_types::AllowedUnitsType::Gram,
+                    UnitData {
+                        amount: 1,
+                        divider: 1,
+                    },
+                );
+                map.insert(
+                    crate::data_types::AllowedUnitsType::Box,
+                    UnitData {
+                        amount: 100,
+                        divider: 1,
+                    },
+                );
                 map
             },
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::AllowedUnitsType::Cup, 250);
-                map.insert(crate::data_types::AllowedUnitsType::Teaspoon, 5);
-                map.insert(crate::data_types::AllowedUnitsType::Tablespoon, 5);
+                map.insert(
+                    crate::data_types::AllowedUnitsType::Cup,
+                    UnitData {
+                        amount: 250,
+                        divider: 1,
+                    },
+                );
+                map.insert(
+                    crate::data_types::AllowedUnitsType::Teaspoon,
+                    UnitData {
+                        amount: 5,
+                        divider: 1,
+                    },
+                );
+                map.insert(
+                    crate::data_types::AllowedUnitsType::Tablespoon,
+                    UnitData {
+                        amount: 5,
+                        divider: 1,
+                    },
+                );
                 map
             },
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::AllowedUnitsType::Cup, 250);
+                map.insert(
+                    crate::data_types::AllowedUnitsType::Cup,
+                    UnitData {
+                        amount: 250,
+                        divider: 1,
+                    },
+                );
                 map
             },
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::AllowedUnitsType::Teaspoon, 1);
+                map.insert(
+                    crate::data_types::AllowedUnitsType::Teaspoon,
+                    UnitData {
+                        amount: 1,
+                        divider: 1,
+                    },
+                );
                 map
             },
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::AllowedUnitsType::Box, 50);
+                map.insert(
+                    crate::data_types::AllowedUnitsType::Box,
+                    UnitData {
+                        amount: 50,
+                        divider: 1,
+                    },
+                );
                 map
             },
             {
                 let mut map = HashMap::new();
-                map.insert(crate::data_types::AllowedUnitsType::Piece, 1);
+                map.insert(
+                    crate::data_types::AllowedUnitsType::Gram,
+                    UnitData {
+                        amount: 1,
+                        divider: 1,
+                    },
+                );
                 map
             },
         ];
@@ -173,13 +228,13 @@ impl DbWrapper for MockProductDb {
         &mut self,
         product_id: &str,
         allowed_unit: crate::data_types::AllowedUnitsType,
-        quantity: u16,
+        unit_data: UnitData,
     ) -> Result<(), String> {
         let product = self
             .products
             .get_mut(product_id)
             .ok_or_else(|| format!("Product with ID '{product_id}' not found."))?;
-        product.allowed_units.insert(allowed_unit, quantity);
+        product.allowed_units.insert(allowed_unit, unit_data);
         Ok(())
     }
 }
@@ -216,7 +271,13 @@ mod tests {
             Box::default(),
             {
                 let mut map = std::collections::HashMap::new();
-                map.insert(crate::data_types::AllowedUnitsType::Piece, 1);
+                map.insert(
+                    crate::data_types::AllowedUnitsType::Gram,
+                    UnitData {
+                        amount: 1,
+                        divider: 1,
+                    },
+                );
                 map
             },
         );
@@ -280,11 +341,14 @@ mod tests {
         let mut db = MockProductDb::new();
         let product_id = "Apple (BrandedApple)";
         let unit = crate::data_types::AllowedUnitsType::Cup;
-        let quantity = 123;
-        let result = db.set_product_unit(product_id, unit, quantity);
+        let unit_data = UnitData {
+            amount: 123,
+            divider: 2,
+        };
+        let result = db.set_product_unit(product_id, unit, unit_data);
         assert!(result.is_ok());
         let product = db.products.get(product_id).unwrap();
-        assert_eq!(product.allowed_units.get(&unit), Some(&quantity));
+        assert_eq!(product.allowed_units.get(&unit), Some(&unit_data));
     }
 
     #[test]
@@ -292,8 +356,11 @@ mod tests {
         let mut db = MockProductDb::new();
         let product_id = "NonExistentProduct";
         let unit = crate::data_types::AllowedUnitsType::Cup;
-        let quantity = 123;
-        let result = db.set_product_unit(product_id, unit, quantity);
+        let unit_data = UnitData {
+            amount: 123,
+            divider: 1,
+        };
+        let result = db.set_product_unit(product_id, unit, unit_data);
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
