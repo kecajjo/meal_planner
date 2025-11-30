@@ -107,8 +107,7 @@ impl MockProductDb {
     }
 
     fn add_or_modify_product(&mut self, product: Product) {
-        self.products
-            .insert(self.get_product_default_id(&product), product);
+        self.products.insert(product.id(), product);
     }
 }
 
@@ -121,7 +120,7 @@ impl MutableDbWrapper for MockProductDb {
         if self.products.contains_key(product_id) {
             return Err(format!(
                 "Product with ID '{}' already exists.",
-                self.get_product_default_id(&product)
+                product.id()
             ));
         }
         self.add_or_modify_product(product);
@@ -152,9 +151,7 @@ impl DbWrapper for MockProductDb {
     ) -> HashMap<String, crate::data_types::Product> {
         let is_prod_matching_crit = |product: &Product, criterion: &DbSearchCriteria| -> bool {
             match criterion {
-                DbSearchCriteria::ById(name_crit) => {
-                    self.get_product_default_id(product).starts_with(name_crit)
-                }
+                DbSearchCriteria::ById(name_crit) => product.id().starts_with(name_crit),
             }
         };
 
@@ -222,19 +219,13 @@ mod tests {
             },
         );
         assert!(
-            db.add_product(
-                db.get_product_default_id(&product).as_str(),
-                product.clone()
-            )
-            .is_ok()
+            db.add_product(product.id().as_str(), product.clone())
+                .is_ok()
         );
-        let key = db.get_product_default_id(&product);
+        let key = product.id();
         assert!(db.products.contains_key(&key));
         // Adding again should not duplicate
-        assert!(
-            db.add_product(db.get_product_default_id(&product).as_str(), product)
-                .is_err()
-        );
+        assert!(db.add_product(product.id().as_str(), product).is_err());
         assert_eq!(db.products.len(), 7);
     }
 
@@ -246,11 +237,8 @@ mod tests {
         let new_macros = Box::new(MacroElements::new(9.0, 8.0, 7.0, 6.0, 5.0));
         product.macro_elements = new_macros.clone();
         assert!(
-            db.update_product(
-                db.get_product_default_id(&product).as_str(),
-                product.clone()
-            )
-            .is_ok()
+            db.update_product(product.id().as_str(), product.clone())
+                .is_ok()
         );
         let updated = &db.products[key].macro_elements;
         use crate::data_types::MacroElementsType;

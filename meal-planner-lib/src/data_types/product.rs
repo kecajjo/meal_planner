@@ -67,6 +67,13 @@ impl Product {
     pub fn brand(&self) -> Option<&str> {
         self.brand.as_deref()
     }
+
+    pub fn id(&self) -> String {
+        match &self.brand {
+            Some(brand) => format!("{} ({})", self.name(), brand),
+            None => self.name.clone(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -151,5 +158,68 @@ mod tests {
         assert_eq!(AllowedUnitsType::Teaspoon.to_string(), "teaspoon");
         assert_eq!(AllowedUnitsType::Box.to_string(), "box");
         assert_eq!(AllowedUnitsType::Custom.to_string(), "custom");
+    }
+
+    #[test]
+    fn test_product_id_with_brand() {
+        let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
+        let micro_nutrients = Box::new(MicroNutrients::default());
+        let product = Product::new(
+            "Apple".to_string(),
+            Some("FreshFarms".to_string()),
+            macro_elements,
+            micro_nutrients,
+            std::collections::HashMap::new(),
+        );
+        assert_eq!(product.id(), "Apple (FreshFarms)");
+    }
+
+    #[test]
+    fn test_product_id_without_brand() {
+        let macro_elements = Box::new(MacroElements::new(1.0, 2.0, 3.0, 4.0, 5.0));
+        let micro_nutrients = Box::new(MicroNutrients::default());
+        let product = Product::new(
+            "Banana".to_string(),
+            None,
+            macro_elements,
+            micro_nutrients,
+            std::collections::HashMap::new(),
+        );
+        assert_eq!(product.id(), "Banana");
+    }
+
+    #[test]
+    fn test_allowed_units_empty_inserts_default() {
+        let macro_elements = Box::new(MacroElements::new(0.0, 0.0, 0.0, 0.0, 0.0));
+        let micro_nutrients = Box::new(MicroNutrients::default());
+        let product = Product::new(
+            "DefaultUnit".to_string(),
+            None,
+            macro_elements,
+            micro_nutrients,
+            std::collections::HashMap::new(),
+        );
+        assert_eq!(
+            product.allowed_units.get(&AllowedUnitsType::Piece),
+            Some(&1)
+        );
+        assert_eq!(product.allowed_units.len(), 1);
+    }
+
+    #[test]
+    fn test_allowed_units_multiple_units() {
+        let macro_elements = Box::new(MacroElements::new(0.0, 0.0, 0.0, 0.0, 0.0));
+        let micro_nutrients = Box::new(MicroNutrients::default());
+        let mut allowed_units = std::collections::HashMap::new();
+        allowed_units.insert(AllowedUnitsType::Cup, 2);
+        allowed_units.insert(AllowedUnitsType::Box, 5);
+        let product = Product::new(
+            "MultiUnit".to_string(),
+            None,
+            macro_elements,
+            micro_nutrients,
+            allowed_units.clone(),
+        );
+        assert_eq!(product.allowed_units, allowed_units);
     }
 }

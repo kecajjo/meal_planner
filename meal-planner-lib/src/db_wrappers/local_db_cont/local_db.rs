@@ -487,7 +487,7 @@ impl MutableDbWrapper for LocalProductDb {
                 run_query(
                     $sql_table_var.to_string().as_str(),
                     format!("id, {}", col_names).as_str(),
-                    format!("'{}', {}", self.get_product_default_id(&product), values).as_str(),
+                    format!("'{}', {}", product.id(), values).as_str(),
                 )?;
             };
         }
@@ -715,7 +715,7 @@ mod tests {
                 allowed_units,
             );
 
-            let product_id = db.get_product_default_id(&product);
+            let product_id = product.id();
             db.add_product(product_id.as_str(), product)
                 .expect("Expected add_product to succeed for persisted product");
         }
@@ -892,7 +892,7 @@ mod tests {
             apple_micro,
             apple_allowed,
         );
-        let apple_id = db.get_product_default_id(&apple);
+        let apple_id = apple.id();
         db.add_product(apple_id.as_str(), apple)
             .map_err(|e| format!("Failed to seed product {}: {}", apple_id, e))?;
 
@@ -912,7 +912,7 @@ mod tests {
             banana_micro,
             banana_allowed,
         );
-        let banana_id = db.get_product_default_id(&banana);
+        let banana_id = banana.id();
         db.add_product(banana_id.as_str(), banana)
             .map_err(|e| format!("Failed to seed product {}: {}", banana_id, e))?;
 
@@ -1010,7 +1010,7 @@ mod tests {
             Box::default(),
             allowed_units,
         );
-        let new_id = db.get_product_default_id(&new_product);
+        let new_id = new_product.id();
         assert!(
             db.add_product(new_id.as_str(), new_product.clone()).is_ok(),
             "Expected add_product to succeed"
