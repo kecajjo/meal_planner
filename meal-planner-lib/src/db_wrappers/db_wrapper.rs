@@ -157,7 +157,7 @@ mod dbwrapper_trait_default_impl_tests {
             products,
             set_calls: std::cell::RefCell::new(vec![]),
         };
-        let result = db.update_product_units(&prod.id().as_str(), &prod.allowed_units);
+        let result = db.update_product_units(&prod.id(), &prod.allowed_units);
         assert!(result.is_ok());
         let calls = db.set_calls.borrow();
         assert_eq!(calls.len(), 1);
