@@ -70,8 +70,8 @@ impl Product {
 
     pub fn id(&self) -> String {
         match &self.brand {
-            Some(brand) => format!("{} ({})", self.name(), brand),
-            None => self.name.clone(),
+            Some(brand) if !brand.is_empty() => format!("{} ({})", self.name(), brand),
+            _ => self.name.clone(),
         }
     }
 }
