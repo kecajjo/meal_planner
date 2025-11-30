@@ -66,6 +66,7 @@ pub struct MicroNutrientsIterMut<'a> {
 }
 
 impl MicroNutrients {
+    #[allow(dead_code)]
     fn iter_mut(&mut self) -> MicroNutrientsIterMut<'_> {
         <&mut Self as IntoIterator>::into_iter(self)
     }

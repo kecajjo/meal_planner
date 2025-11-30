@@ -55,17 +55,17 @@ impl NutrientConstraint {
         })
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn element(&self) -> NutrientType {
         self.element
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn min(&self) -> Option<f32> {
         self.min
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn max(&self) -> Option<f32> {
         self.max
     }
