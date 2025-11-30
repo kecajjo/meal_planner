@@ -231,6 +231,7 @@ mod tests {
 
     #[test]
     fn test_update_product() {
+        use crate::data_types::MacroElementsType;
         let mut db = MockProductDb::new();
         let key = "Apple (BrandedApple)";
         let mut product = db.products[key].clone();
@@ -241,7 +242,6 @@ mod tests {
                 .is_ok()
         );
         let updated = &db.products[key].macro_elements;
-        use crate::data_types::MacroElementsType;
         assert_eq!(
             updated[MacroElementsType::Fat],
             new_macros[MacroElementsType::Fat]
@@ -296,7 +296,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            format!("Product with ID '{}' not found.", product_id)
+            format!("Product with ID '{product_id}' not found.")
         );
     }
 }

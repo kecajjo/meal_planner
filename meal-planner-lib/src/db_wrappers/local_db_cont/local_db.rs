@@ -44,10 +44,10 @@ impl fmt::Display for SqlTablesNames {
 // TODO panicking to be replaced with proper error handling
 impl LocalProductDb {
     pub fn new(database_file: &str) -> Option<Self> {
-        let con =
-            rusqlite::Connection::open(database_file).expect("Failed to open SQLite database");
-        con.execute("PRAGMA foreign_keys = ON;", [])
-            .expect("Failed to enable foreign keys");
+        let con = rusqlite::Connection::open(database_file).ok()?;
+        if con.execute("PRAGMA foreign_keys = ON;", []).is_err() {
+            return None;
+        }
         Self::init_db_if_new_created(&con);
         Some(LocalProductDb { sqlite_con: con })
     }
