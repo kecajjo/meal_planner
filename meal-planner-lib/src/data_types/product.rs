@@ -71,6 +71,7 @@ impl Product {
         self.brand.as_deref()
     }
 
+    #[must_use]
     pub fn id(&self) -> String {
         match &self.brand {
             Some(brand) if !brand.is_empty() => format!("{} ({})", self.name(), brand),

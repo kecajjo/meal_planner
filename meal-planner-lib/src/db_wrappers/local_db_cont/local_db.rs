@@ -1,4 +1,5 @@
 use core::fmt;
+use core::fmt::Write;
 use std::collections::{HashMap, HashSet};
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::EnumIter;
@@ -219,18 +220,20 @@ fn db_search_criteria_to_sql_query_fragment(
         }
         match criterion {
             DbSearchCriteria::ById(name) => {
-                query_fragment.push_str(&format!(
+                write!(
+                    query_fragment,
                     "{}.name LIKE '{}%'",
                     SqlTablesNames::Products,
                     name
-                ));
+                )
+                .unwrap();
             }
         }
     }
     Ok(query_fragment)
 }
 
-fn map_query_row_to_product(row: &rusqlite::Row) -> Result<(String, Product), rusqlite::Error> {
+fn map_query_row_to_product(row: &rusqlite::Row) -> (String, Product) {
     enum SelectColumnIndexToProductData {
         Id = 0,
         Name = 1,
@@ -285,10 +288,10 @@ fn map_query_row_to_product(row: &rusqlite::Row) -> Result<(String, Product), ru
         Box::new(micronutrients),
         allowed_units,
     );
-    Ok((
+    (
         row.get_unwrap(SelectColumnIndexToProductData::Id as usize),
         product,
-    ))
+    )
 }
 
 impl DbWrapper for LocalProductDb {
@@ -304,7 +307,7 @@ impl DbWrapper for LocalProductDb {
         let mut append_columns =
             |table: SqlTablesNames, iter: &mut dyn Iterator<Item = Option<String>>| {
                 for col in iter.flatten() {
-                    query_template.push_str(&format!(", {table}.\"{col}\""));
+                    write!(query_template, ", {table}.\"{col}\"").unwrap();
                 }
             };
 
@@ -327,7 +330,8 @@ impl DbWrapper for LocalProductDb {
             &mut AllowedUnitsType::iter().map(|m| Some(m.to_string())),
         );
 
-        query_template.push_str(&format!(
+        write!(
+            query_template,
             " FROM {p}
             INNER JOIN {me} ON {p}.id = {me}.id
             INNER JOIN {au} ON {p}.id = {au}.id
@@ -336,7 +340,8 @@ impl DbWrapper for LocalProductDb {
             me = SqlTablesNames::MacroElements,
             au = SqlTablesNames::AllowedUnits,
             mn = SqlTablesNames::MicroNutrients
-        ));
+        )
+        .unwrap();
         query_template.push_str(
             db_search_criteria_to_sql_query_fragment(criteria)
                 .expect("Failed to convert search criteria to SQL query fragment")
@@ -351,7 +356,7 @@ impl DbWrapper for LocalProductDb {
 
         let mut result_map = HashMap::new();
         let product_iter = stmt
-            .query_map([], map_query_row_to_product)
+            .query_map([], |row| Ok(map_query_row_to_product(row)))
             .expect("Failed to map query results")
             .map(|res| res.expect("Failed to map row to product"));
 
@@ -383,6 +388,8 @@ impl DbWrapper for LocalProductDb {
     }
 }
 
+// function is long because there are 2 macro definitions inside
+#[allow(clippy::too_many_lines)]
 impl MutableDbWrapper for LocalProductDb {
     fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         let run_query = |table_name: &str,
@@ -660,8 +667,8 @@ mod tests {
                 .map(|m| m.to_string()),
         );
 
-        let mut micro_columns = vec!["id".to_string()];
-        micro_columns.extend(MicroNutrientsType::iter().map(|m| m.to_string()));
+        let mut nutrient_columns = vec!["id".to_string()];
+        nutrient_columns.extend(MicroNutrientsType::iter().map(|m| m.to_string()));
 
         let mut allowed_columns = vec!["id".to_string()];
         allowed_columns.extend(AllowedUnitsType::iter().map(|u| u.to_string()));
@@ -669,7 +676,7 @@ mod tests {
         let product_columns = vec!["id".to_string(), "name".to_string(), "brand".to_string()];
         assert_table_columns(&connection, "products", &product_columns);
         assert_table_columns(&connection, "macro_elements", &macro_columns);
-        assert_table_columns(&connection, "micronutrients", &micro_columns);
+        assert_table_columns(&connection, "micronutrients", &nutrient_columns);
         assert_table_columns(&connection, "allowed_units", &allowed_columns);
 
         drop(connection);
@@ -784,6 +791,7 @@ mod tests {
     }
 
     fn unique_test_db_path() -> PathBuf {
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
         static INIT_CLEANUP: Once = Once::new();
         INIT_CLEANUP.call_once(|| {
             if let Err(err) = cleanup_previous_test_databases() {
@@ -791,7 +799,6 @@ mod tests {
             }
         });
 
-        static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let suffix = COUNTER.fetch_add(1, Ordering::Relaxed);
 
         let base_path = Path::new(DATABASE_FILENAME);
@@ -834,9 +841,8 @@ mod tests {
             if !path.is_file() {
                 continue;
             }
-            let file_stem = match path.file_stem().and_then(|s| s.to_str()) {
-                Some(stem_val) => stem_val,
-                None => continue,
+            let Some(file_stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
             };
             if !file_stem.starts_with(&prefix) {
                 continue;

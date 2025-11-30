@@ -190,6 +190,7 @@ mod tests {
 
     use super::*;
     use crate::data_types::{MacroElements, Product};
+    use crate::db_wrappers::DbSearchCriteria;
 
     #[test]
     fn test_new_and_sample_products() {
@@ -267,7 +268,6 @@ mod tests {
     #[test]
     fn test_get_products_matching_criteria_by_name() {
         let db = MockProductDb::new();
-        use crate::db_wrappers::DbSearchCriteria;
         let crit = vec![DbSearchCriteria::ById("App".to_string())];
         let results = db.get_products_matching_criteria(&crit);
         assert_eq!(results.len(), 1);

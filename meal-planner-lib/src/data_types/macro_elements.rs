@@ -37,6 +37,7 @@ pub struct MacroElements {
 }
 
 impl MacroElements {
+    #[allow(clippy::match_wildcard_for_single_variants)]
     #[must_use]
     pub fn new(fat: f32, saturated_fat: f32, carbs: f32, sugar: f32, protein: f32) -> Self {
         let mut elements = std::collections::HashMap::new();

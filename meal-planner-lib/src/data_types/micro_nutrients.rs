@@ -65,6 +65,12 @@ pub struct MicroNutrientsIterMut<'a> {
     inner: std::collections::hash_map::IterMut<'a, MicroNutrientsType, Option<f32>>,
 }
 
+impl MicroNutrients {
+    fn iter_mut(&mut self) -> MicroNutrientsIterMut<'_> {
+        <&mut Self as IntoIterator>::into_iter(self)
+    }
+}
+
 impl<'a> IntoIterator for &'a mut MicroNutrients {
     type Item = (MicroNutrientsType, &'a mut Option<f32>);
     type IntoIter = MicroNutrientsIterMut<'a>;
