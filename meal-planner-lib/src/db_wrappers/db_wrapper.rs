@@ -39,15 +39,6 @@ pub trait DbWrapper {
         criteria: &[DbSearchCriteria],
     ) -> HashMap<String, crate::data_types::Product>;
 
-    fn get_product_default_id(&self, product: &Product) -> String {
-        let brand = product.brand().unwrap_or_default();
-        if brand.is_empty() {
-            product.name().to_string()
-        } else {
-            format!("{} ({})", product.name(), brand)
-        }
-    }
-
     fn set_product_unit(
         &mut self,
         product_id: &str,
@@ -158,18 +149,6 @@ mod dbwrapper_trait_default_impl_tests {
     }
 
     #[test]
-    fn test_get_product_id_default_impl() {
-        let db = DummyDb {
-            products: HashMap::new(),
-            set_calls: std::cell::RefCell::new(vec![]),
-        };
-        let prod1 = make_product("Apple", Some("BrandA"));
-        let prod2 = make_product("Banana", None);
-        assert_eq!(db.get_product_default_id(&prod1), "Apple (BrandA)");
-        assert_eq!(db.get_product_default_id(&prod2), "Banana");
-    }
-
-    #[test]
     fn test_update_product_units_default_impl() {
         let mut products = HashMap::new();
         let prod = make_product("Apple", Some("BrandA"));
@@ -178,10 +157,7 @@ mod dbwrapper_trait_default_impl_tests {
             products,
             set_calls: std::cell::RefCell::new(vec![]),
         };
-        let result = db.update_product_units(
-            db.get_product_default_id(&prod).as_str(),
-            &prod.allowed_units,
-        );
+        let result = db.update_product_units(&prod.id(), &prod.allowed_units);
         assert!(result.is_ok());
         let calls = db.set_calls.borrow();
         assert_eq!(calls.len(), 1);
