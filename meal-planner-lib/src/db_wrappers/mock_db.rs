@@ -191,6 +191,7 @@ mod tests {
     use super::*;
     use crate::data_types::{MacroElements, Product};
     use crate::db_wrappers::DbSearchCriteria;
+    use approx::assert_relative_eq;
 
     #[test]
     fn test_new_and_sample_products() {
@@ -243,23 +244,23 @@ mod tests {
                 .is_ok()
         );
         let updated = &db.products[key].macro_elements;
-        assert_eq!(
+        assert_relative_eq!(
             updated[MacroElementsType::Fat],
             new_macros[MacroElementsType::Fat]
         );
-        assert_eq!(
+        assert_relative_eq!(
             updated[MacroElementsType::SaturatedFat],
             new_macros[MacroElementsType::SaturatedFat]
         );
-        assert_eq!(
+        assert_relative_eq!(
             updated[MacroElementsType::Carbs],
             new_macros[MacroElementsType::Carbs]
         );
-        assert_eq!(
+        assert_relative_eq!(
             updated[MacroElementsType::Sugar],
             new_macros[MacroElementsType::Sugar]
         );
-        assert_eq!(
+        assert_relative_eq!(
             updated[MacroElementsType::Protein],
             new_macros[MacroElementsType::Protein]
         );

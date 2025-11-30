@@ -599,6 +599,7 @@ mod tests {
         MicroNutrientsType,
     };
     use crate::db_wrappers::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
+    use approx::assert_relative_eq;
     use rusqlite::{Connection, params};
     use std::collections::HashMap;
     use std::fs;
@@ -948,11 +949,7 @@ mod tests {
             .expect("Missing Apple product");
         assert_eq!(apple.name(), "Apple");
         assert_eq!(apple.brand(), Some("BrandA"));
-        assert_eq!(
-            apple.macro_elements[MacroElementsType::Fat],
-            0.2_f32,
-            "Unexpected fat value"
-        );
+        assert_relative_eq!(apple.macro_elements[MacroElementsType::Fat], 0.2_f32);
         assert_eq!(
             apple.micro_nutrients[MicroNutrientsType::Fiber],
             Some(2.4_f32)

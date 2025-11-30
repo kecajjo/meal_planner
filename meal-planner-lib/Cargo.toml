@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+approx = "0.5.1"
 const_format = "0.2.35"
 microlp = "0.2.11"
 strum = "0.27.2"
@@ -14,7 +15,6 @@ rusqlite = "0.37.0"
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }
-float-cmp = { level = "allow", priority = 2 }
 missing_errors_doc = { level = "allow", priority = 2 }
 assigning_clones = { level = "allow", priority = 2 }
 cast_possible_wrap = { level = "allow", priority = 2 }

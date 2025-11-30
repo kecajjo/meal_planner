@@ -84,6 +84,7 @@ impl Product {
 mod tests {
     use super::*;
     use crate::data_types::{MacroElementsType, MicroNutrientsType};
+    use approx::assert_relative_eq;
 
     #[test]
     fn test_product_new_and_accessors() {
@@ -102,7 +103,7 @@ mod tests {
         );
         assert_eq!(product.name(), "TestName");
         assert_eq!(product.brand(), Some("TestBrand"));
-        assert_eq!(product.macro_elements[MacroElementsType::Fat], 1.0);
+        assert_relative_eq!(product.macro_elements[MacroElementsType::Fat], 1.0);
         assert_eq!(product.micro_nutrients[MicroNutrientsType::Fiber], None);
         let mut expected_allowed_units = std::collections::HashMap::new();
         expected_allowed_units.insert(AllowedUnitsType::Piece, 123);
@@ -127,7 +128,7 @@ mod tests {
         };
         assert_eq!(product.name, "Test Product");
         assert_eq!(product.brand.as_deref(), Some("Test Brand"));
-        assert_eq!(product.macro_elements[MacroElementsType::Fat], 1.0);
+        assert_relative_eq!(product.macro_elements[MacroElementsType::Fat], 1.0);
         assert_eq!(
             product.micro_nutrients[MicroNutrientsType::Fiber],
             Some(2.5)
