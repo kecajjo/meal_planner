@@ -4,12 +4,12 @@ use std::collections::HashMap;
 use crate::data_types::{Product, UnitData};
 
 use super::local_db;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 use super::mock_db;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataBaseTypes {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-utils"))]
     Mock,
     OpenFoodFacts,
     Local,
@@ -22,7 +22,7 @@ pub enum DbSearchCriteria {
 
 pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn DbWrapper>> {
     match db_type {
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-utils"))]
         DataBaseTypes::Mock => Some(Box::new(mock_db::MockProductDb::new())),
         DataBaseTypes::Local => Some(Box::new(local_db::LocalProductDb::new(
             local_db::DATABASE_FILENAME,

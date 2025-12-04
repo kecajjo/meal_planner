@@ -245,7 +245,7 @@ mod tests {
 
     use super::*;
     use crate::data_types::{MacroElements, Product};
-    use crate::db_wrappers::DbSearchCriteria;
+    use crate::database_access::DbSearchCriteria;
     use approx::assert_relative_eq;
 
     #[test]

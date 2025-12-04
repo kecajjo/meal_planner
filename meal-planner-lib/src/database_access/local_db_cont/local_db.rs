@@ -8,11 +8,11 @@ use crate::data_types::{
     AllowedUnits, AllowedUnitsType, MacroElements, MacroElementsType, MicroNutrients,
     MicroNutrientsType, Product, UnitData,
 };
-use crate::db_wrappers::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
+use crate::database_access::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
 use const_format::concatcp;
 
 // cant make paths relative to this file
-const DATABASE_PATH: &str = "src/db_wrappers/local_db_cont/";
+const DATABASE_PATH: &str = "src/database_access/local_db_cont/";
 #[cfg(not(test))]
 pub(crate) const DATABASE_FILENAME: &str = concatcp!(DATABASE_PATH, "local_db.sqlite");
 #[cfg(test)]
@@ -629,7 +629,7 @@ mod tests {
         AllowedUnits, AllowedUnitsType, MacroElements, MacroElementsType, MicroNutrients,
         MicroNutrientsType, UnitData,
     };
-    use crate::db_wrappers::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
+    use crate::database_access::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
     use approx::assert_relative_eq;
     use rusqlite::{Connection, params};
     use std::collections::HashMap;

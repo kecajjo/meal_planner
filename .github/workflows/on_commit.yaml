@@ -26,8 +26,8 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Build
-        run: cargo build --workspace --all-targets
+        run: cargo build --workspace --all-targets --features test-utils
       - name: Test
-        run: cargo test --workspace --all-targets
+        run: cargo test --workspace --all-targets --features test-utils
       - name: Format
         run: cargo fmt --all -- --check
