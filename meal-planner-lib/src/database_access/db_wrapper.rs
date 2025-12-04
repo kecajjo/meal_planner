@@ -20,7 +20,7 @@ pub enum DbSearchCriteria {
     // ByBarcode(String),
 }
 
-pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn DbWrapper>> {
+pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn Database>> {
     match db_type {
         #[cfg(any(test, feature = "test-utils"))]
         DataBaseTypes::Mock => Some(Box::new(mock_db::MockProductDb::new())),
@@ -34,7 +34,28 @@ pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn DbWrapper>> {
     }
 }
 
-pub trait DbWrapper {
+pub fn get_mutable_db(db_type: DataBaseTypes) -> Option<Box<dyn MutableDatabase>> {
+    match db_type {
+        #[cfg(any(test, feature = "test-utils"))]
+        DataBaseTypes::Mock => Some(Box::new(mock_db::MockProductDb::new())),
+        DataBaseTypes::Local => Some(Box::new(local_db::LocalProductDb::new(
+            local_db::DATABASE_FILENAME,
+        )?)),
+        _ => panic!("Database type not supported in this build."),
+    }
+}
+
+pub fn get_mutable_db_types() -> Vec<DataBaseTypes> {
+    let mut types = vec![];
+    #[cfg(any(test, feature = "test-utils"))]
+    {
+        types.push(DataBaseTypes::Mock);
+    }
+    types.push(DataBaseTypes::Local);
+    types
+}
+
+pub trait Database {
     fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
@@ -78,7 +99,7 @@ pub trait DbWrapper {
     }
 }
 
-pub trait MutableDbWrapper: DbWrapper {
+pub trait MutableDatabase: Database {
     fn add_product(
         &mut self,
         product_id: &str,
@@ -99,7 +120,7 @@ mod dbwrapper_trait_default_impl_tests {
         pub set_calls: std::cell::RefCell<Vec<(String, AllowedUnitsType, u16, u16)>>,
     }
 
-    impl DbWrapper for DummyDb {
+    impl Database for DummyDb {
         fn get_products_matching_criteria(
             &self,
             criteria: &[DbSearchCriteria],
