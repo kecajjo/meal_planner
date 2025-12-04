@@ -42,6 +42,7 @@ struct ProductVariable {
     variable_unit_divided: Variable,
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct Fraction {
     pub numerator: u16,
     pub denominator: u16,

@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use approx::assert_relative_eq;
-use meal_planner_lib::bl::constraints_solver::{ConstraintsSolver, MinOrMax, SolutionEntry};
+use meal_planner_lib::constraints_solver::{ConstraintsSolver, MinOrMax, SolutionEntry};
 use meal_planner_lib::data_types::{
     AllowedUnitsType, MacroElementsType, MicroNutrientsType, NutrientType,
     constraints::{DayMealPlanConstraint, MealConstraint, NutrientConstraint, ProductConstraint},
@@ -20,7 +20,7 @@ fn extract_single_product<'a>(
 ) -> (
     &'a meal_planner_lib::data_types::Product,
     f64,
-    &'a meal_planner_lib::bl::constraints_solver::Fraction,
+    &'a meal_planner_lib::constraints_solver::Fraction,
 ) {
     let week_entries = match solution {
         SolutionEntry::Week { entries } => entries,
