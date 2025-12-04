@@ -2,6 +2,7 @@ use crate::data_types::{
     AllowedUnitsType, NutrientType, Product,
     constraints::{DayMealPlanConstraint, MealConstraint, NutrientConstraint, ProductConstraint},
 };
+
 use microlp::{ComparisonOp, OptimizationDirection, Problem, Variable};
 
 #[derive(Debug, Clone, Copy)]
@@ -16,14 +17,14 @@ enum ProductEntry {
 }
 
 impl ProductEntry {
-    fn get_all_products(&self) -> Box<dyn Iterator<Item = &ProductVariable> + '_> {
+    fn get_all_product_variables(&self) -> Box<dyn Iterator<Item = &ProductVariable> + '_> {
         match self {
             ProductEntry::Variable(var) => Box::new(std::iter::once(var)),
             ProductEntry::Subcontainer(container) => Box::new(
                 container
                     .inner
                     .iter()
-                    .flat_map(|entry| entry.get_all_products()),
+                    .flat_map(|entry| entry.get_all_product_variables()),
             ),
         }
     }
@@ -39,6 +40,35 @@ struct ProductVariable {
     unit: AllowedUnitsType,
     variable_gram: Variable,
     variable_unit_divided: Variable,
+}
+
+pub struct Fraction {
+    pub numerator: u16,
+    pub denominator: u16,
+}
+
+pub enum SolutionEntry {
+    Week {
+        entries: Vec<SolutionEntry>,
+    },
+    Day {
+        name: String,
+        entries: Vec<SolutionEntry>,
+    },
+    Meal {
+        name: String,
+        entries: Vec<SolutionEntry>,
+    },
+    Product {
+        product: Product,
+        amount_grams: f64,
+        unit: AllowedUnitsType,
+        amount_unit: Fraction,
+    },
+}
+
+pub struct Solution {
+    pub solution: SolutionEntry,
 }
 
 pub(super) struct ConstraintsSolver {
@@ -64,7 +94,82 @@ impl ConstraintsSolver {
         }
     }
 
-    pub fn create_constraints(&mut self, day_constraints: &DayMealPlanConstraint) {
+    pub fn solve_day(
+        &mut self,
+        day_constraints: &DayMealPlanConstraint,
+    ) -> Result<Solution, String> {
+        self.create_constraints(day_constraints);
+        #[allow(clippy::match_wildcard_for_single_variants)]
+        match self.problem.solve() {
+            Ok(s) => Ok(self.solver_solution_to_output(&s)),
+            Err(e) => match e {
+                microlp::Error::Infeasible => Err("Constraints are infeasible".to_string()),
+                microlp::Error::Unbounded => Err("Problem is unbounded".to_string()),
+                _ => Err(format!("Solving error: {e:?}")),
+            },
+        }
+    }
+
+    fn solver_solution_to_output(&self, solution: &microlp::Solution) -> Solution {
+        let mut week = Vec::new();
+        for day in self.variables.inner.iter().map(|x| {
+            if let ProductEntry::Subcontainer(c) = x {
+                c
+            } else {
+                panic!("Expected day container")
+            }
+        }) {
+            let mut day_entries = Vec::new();
+            for meal in day.inner.iter().map(|x| {
+                if let ProductEntry::Subcontainer(c) = x {
+                    c
+                } else {
+                    panic!("Expected meal container")
+                }
+            }) {
+                let mut meal_entries: Vec<SolutionEntry> = Vec::new();
+                for product in meal.inner.iter().map(|x| {
+                    if let ProductEntry::Variable(v) = x {
+                        v
+                    } else {
+                        panic!("Expected product variable")
+                    }
+                }) {
+                    let product_solution = SolutionEntry::Product {
+                        product: product.product.clone(),
+                        amount_grams: *solution.var_value(product.variable_gram),
+                        unit: product.unit,
+                        amount_unit: Fraction {
+                            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                            numerator: *solution.var_value(product.variable_unit_divided) as u16,
+                            denominator: product
+                                .product
+                                .allowed_units
+                                .get(&product.unit)
+                                .unwrap()
+                                .divider,
+                        },
+                    };
+                    meal_entries.push(product_solution);
+                }
+                let meal_solution = SolutionEntry::Meal {
+                    name: meal.name.clone(),
+                    entries: meal_entries,
+                };
+                day_entries.push(meal_solution);
+            }
+            let day_solution = SolutionEntry::Day {
+                name: day.name.clone(),
+                entries: day_entries,
+            };
+            week.push(day_solution);
+        }
+        Solution {
+            solution: SolutionEntry::Week { entries: week },
+        }
+    }
+
+    fn create_constraints(&mut self, day_constraints: &DayMealPlanConstraint) {
         let mut day_vec = Vec::new();
         self.create_day_constraints(day_constraints, &mut day_vec);
         self.variables
@@ -125,9 +230,11 @@ impl ConstraintsSolver {
         product_constraint: &ProductConstraint,
     ) -> ProductVariable {
         // crate base product variable
-        let nutrient_amount = f64::from(product
-            .get_nutrient_amount(self.nutrient_to_optimize)
-            .unwrap_or(0.0));
+        let nutrient_amount = f64::from(
+            product
+                .get_nutrient_amount(self.nutrient_to_optimize)
+                .unwrap_or(0.0),
+        );
 
         // not int var as int contraint will be given on allowd_units level
         let product_gram_variable = self.problem.add_var(
@@ -148,7 +255,10 @@ impl ConstraintsSolver {
 
         self.problem.add_constraint(
             [
-                (unit_var, f64::from(unit_data.divider) * f64::from(unit_data.amount)),
+                (
+                    unit_var,
+                    f64::from(unit_data.divider) * f64::from(unit_data.amount),
+                ),
                 (product_gram_variable, -1.0),
             ],
             ComparisonOp::Eq,
@@ -172,13 +282,17 @@ impl ConstraintsSolver {
         products: &[ProductEntry],
     ) {
         let mut product_macros = Vec::new();
-        for p in products.iter().flat_map(|entry| entry.get_all_products()) {
+        for p in products
+            .iter()
+            .flat_map(|entry| entry.get_all_product_variables())
+        {
             product_macros.push((
                 p.variable_gram,
-                f64::from(p.product
-                    .get_nutrient_amount(nutrient_constr.element())
-                    .unwrap_or(0.0))
-                    * 0.01,
+                f64::from(
+                    p.product
+                        .get_nutrient_amount(nutrient_constr.element())
+                        .unwrap_or(0.0),
+                ) * 0.01,
             ));
         }
         self.problem.add_constraint(
