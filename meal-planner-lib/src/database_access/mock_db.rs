@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::db_wrapper::{DbSearchCriteria, Database, MutableDatabase};
+use super::db_wrapper::{Database, DbSearchCriteria, MutableDatabase};
 use crate::data_types::{MacroElements, MicroNutrients, MicroNutrientsType, Product, UnitData};
 
 pub struct MockProductDb {

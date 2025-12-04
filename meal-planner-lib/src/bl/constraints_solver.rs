@@ -78,6 +78,7 @@ pub struct ConstraintsSolver {
 }
 
 impl ConstraintsSolver {
+    #[must_use]
     pub fn new(min_or_max: MinOrMax, nutrient_to_optimize: NutrientType) -> Self {
         let problem = match min_or_max {
             MinOrMax::Min => Problem::new(OptimizationDirection::Minimize),
@@ -229,14 +230,14 @@ impl ConstraintsSolver {
         product: &Product,
         product_constraint: &ProductConstraint,
     ) -> ProductVariable {
-        // crate base product variable
+        // create base product variable
         let nutrient_amount = f64::from(
             product
                 .get_nutrient_amount(self.nutrient_to_optimize)
                 .unwrap_or(0.0),
         );
 
-        // not int var as int contraint will be given on allowd_units level
+        // not int var as int constraint will be given on allowed_units level
         let product_gram_variable = self.problem.add_var(
             // nutrient amount per 1g of product
             nutrient_amount * 0.01,
