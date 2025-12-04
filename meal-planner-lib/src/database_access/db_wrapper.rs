@@ -20,6 +20,11 @@ pub enum DbSearchCriteria {
     // ByBarcode(String),
 }
 
+/// Returns a database instance for the given type.
+///
+/// # Panics
+/// Panics if the database type is not supported in this build.
+#[must_use]
 pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn Database>> {
     match db_type {
         #[cfg(any(test, feature = "test-utils"))]
@@ -34,6 +39,11 @@ pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn Database>> {
     }
 }
 
+/// Returns a mutable database instance for the given type.
+///
+/// # Panics
+/// Panics if the database type is not mutable.
+#[must_use]
 pub fn get_mutable_db(db_type: DataBaseTypes) -> Option<Box<dyn MutableDatabase>> {
     match db_type {
         #[cfg(any(test, feature = "test-utils"))]
@@ -41,17 +51,17 @@ pub fn get_mutable_db(db_type: DataBaseTypes) -> Option<Box<dyn MutableDatabase>
         DataBaseTypes::Local => Some(Box::new(local_db::LocalProductDb::new(
             local_db::DATABASE_FILENAME,
         )?)),
-        _ => panic!("Database type not supported in this build."),
+        _ => panic!("Database type not mutable."),
     }
 }
 
+#[must_use]
 pub fn get_mutable_db_types() -> Vec<DataBaseTypes> {
-    let mut types = vec![];
-    #[cfg(any(test, feature = "test-utils"))]
-    {
-        types.push(DataBaseTypes::Mock);
-    }
-    types.push(DataBaseTypes::Local);
+    let types = vec![
+        #[cfg(any(test, feature = "test-utils"))]
+        DataBaseTypes::Mock,
+        DataBaseTypes::Local,
+    ];
     types
 }
 
