@@ -8,7 +8,7 @@ use crate::data_types::{
     AllowedUnits, AllowedUnitsType, MacroElements, MacroElementsType, MicroNutrients,
     MicroNutrientsType, Product, UnitData,
 };
-use crate::database_access::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
+use crate::database_access::{Database, DbSearchCriteria, MutableDatabase};
 use const_format::concatcp;
 
 // cant make paths relative to this file
@@ -314,7 +314,7 @@ fn map_query_row_to_product(row: &rusqlite::Row) -> (String, Product) {
     )
 }
 
-impl DbWrapper for LocalProductDb {
+impl Database for LocalProductDb {
     fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
@@ -411,7 +411,7 @@ impl DbWrapper for LocalProductDb {
 
 // function is long because there are 2 macro definitions inside
 #[allow(clippy::too_many_lines)]
-impl MutableDbWrapper for LocalProductDb {
+impl MutableDatabase for LocalProductDb {
     fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         let run_query = |table_name: &str,
                          columns_str: &str,
@@ -629,7 +629,7 @@ mod tests {
         AllowedUnits, AllowedUnitsType, MacroElements, MacroElementsType, MicroNutrients,
         MicroNutrientsType, UnitData,
     };
-    use crate::database_access::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
+    use crate::database_access::{Database, DbSearchCriteria, MutableDatabase};
     use approx::assert_relative_eq;
     use rusqlite::{Connection, params};
     use std::collections::HashMap;

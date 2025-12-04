@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::db_wrapper::{DbSearchCriteria, DbWrapper, MutableDbWrapper};
+use super::db_wrapper::{DbSearchCriteria, Database, MutableDatabase};
 use crate::data_types::{MacroElements, MicroNutrients, MicroNutrientsType, Product, UnitData};
 
 pub struct MockProductDb {
@@ -166,7 +166,7 @@ impl MockProductDb {
     }
 }
 
-impl MutableDbWrapper for MockProductDb {
+impl MutableDatabase for MockProductDb {
     fn add_product(
         &mut self,
         product_id: &str,
@@ -199,7 +199,7 @@ impl MutableDbWrapper for MockProductDb {
     }
 }
 
-impl DbWrapper for MockProductDb {
+impl Database for MockProductDb {
     fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],

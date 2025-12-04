@@ -8,7 +8,7 @@ use meal_planner_lib::data_types::{
     AllowedUnitsType, MacroElementsType, MicroNutrientsType, NutrientType,
     constraints::{DayMealPlanConstraint, MealConstraint, NutrientConstraint, ProductConstraint},
 };
-use meal_planner_lib::database_access::{DataBaseTypes, DbSearchCriteria, DbWrapper, get_db};
+use meal_planner_lib::database_access::{DataBaseTypes, DbSearchCriteria, Database, get_db};
 
 fn mock_db() -> Box<dyn DbWrapper> {
     get_db(DataBaseTypes::Mock).expect("mock database should be available")
