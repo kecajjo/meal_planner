@@ -70,9 +70,7 @@ impl ProductSwapper {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::data_types::{
-        MacroElements, MacroElementsType, MicroNutrients, MicroNutrientsType, UnitData,
-    };
+    use crate::data_types::{MacroElements, MacroElementsType, MicroNutrientsType, UnitData};
 
     fn make_product(
         name: &str,
@@ -94,7 +92,7 @@ mod tests {
             name.to_string(),
             None,
             Box::new(MacroElements::new(fat_per_100g, 0.0, 0.0, 0.0, 0.0)),
-            Box::new(MicroNutrients::default()),
+            Box::default(),
             allowed_units,
         )
     }
