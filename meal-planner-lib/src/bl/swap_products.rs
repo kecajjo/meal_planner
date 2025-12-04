@@ -1,5 +1,6 @@
 use super::constraints_solver::Fraction;
 use crate::data_types::{AllowedUnitsType, NutrientType, Product};
+use approx::{self, relative_eq};
 
 struct ProductSwapper {}
 
@@ -52,11 +53,19 @@ impl ProductSwapper {
                 allowed_units
             ));
         };
-        let calculated_amout = amount * nutrient_amount / nutrient_amount_output;
+        if relative_eq!(nutrient_amount_output, 0.0) {
+            return Err(format!(
+                "Output product '{}' has zero amount of nutrient '{:?}'",
+                output.id(),
+                nutrient_equivalent
+            ));
+        }
+        let calculated_amount = amount * nutrient_amount / nutrient_amount_output;
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let low_calculated_amount = Fraction {
-            numerator: (calculated_amout * f32::from(unit_size.divider)
-                / f32::from(unit_size.amount).floor()) as u16,
+            numerator: (calculated_amount * f32::from(unit_size.divider)
+                / f32::from(unit_size.amount))
+            .floor() as u16,
             denominator: unit_size.divider,
         };
         let high_calculated_amount = Fraction {
@@ -167,5 +176,42 @@ mod tests {
             err,
             "Input product 'Olive' does not have allowed unit 'Cup'"
         );
+    }
+
+    #[test]
+    fn error_when_output_missing_nutrient() {
+        let mut olive = make_product("Olive", 91.0, &[]);
+        let milk = make_product("Milk", 3.0, &[]);
+        olive.micro_nutrients[MicroNutrientsType::Fiber] = Some(5.0);
+        let nutrient = NutrientType::Micro(MicroNutrientsType::Fiber);
+        let err = ProductSwapper::get_amount_of_swapped_product(
+            &olive,
+            10.0,
+            &milk,
+            nutrient,
+            AllowedUnitsType::Gram,
+        )
+        .expect_err("missing output nutrient should return error");
+        let expected = format!("Output product 'Milk' does not have nutrient '{nutrient:?}'");
+        assert_eq!(err, expected);
+    }
+
+    #[test]
+    fn error_when_output_nutrient_is_zero() {
+        let mut olive = make_product("Olive", 91.0, &[]);
+        let mut milk = make_product("Milk", 3.0, &[]);
+        olive.micro_nutrients[MicroNutrientsType::Fiber] = Some(5.0);
+        milk.micro_nutrients[MicroNutrientsType::Fiber] = Some(0.0);
+        let nutrient = NutrientType::Micro(MicroNutrientsType::Fiber);
+        let err = ProductSwapper::get_amount_of_swapped_product(
+            &olive,
+            10.0,
+            &milk,
+            nutrient,
+            AllowedUnitsType::Gram,
+        )
+        .expect_err("zero output nutrient should return error");
+        let expected = format!("Output product 'Milk' has zero amount of nutrient '{nutrient:?}'");
+        assert_eq!(err, expected);
     }
 }
