@@ -1,7 +1,7 @@
 use core::fmt;
 use core::fmt::Write;
 use std::collections::{HashMap, HashSet};
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -90,7 +90,8 @@ impl SqliteConnection {
             .map_err(|_| "Database path contains interior null byte".to_string())?;
         let mut db_ptr: *mut ffi::sqlite3 = ptr::null_mut();
         let flags = ffi::SQLITE_OPEN_CREATE | ffi::SQLITE_OPEN_READWRITE;
-        let rc = unsafe { ffi::sqlite3_open_v2(c_path.as_ptr(), &mut db_ptr, flags, ptr::null()) };
+        let rc =
+            unsafe { ffi::sqlite3_open_v2(c_path.as_ptr(), &raw mut db_ptr, flags, ptr::null()) };
         if rc != ffi::SQLITE_OK {
             let message = Self::extract_errmsg(db_ptr, rc);
             if !db_ptr.is_null() {
@@ -128,7 +129,13 @@ impl SqliteConnection {
         let c_sql = CString::new(sql).map_err(|_| "SQL contains interior null byte".to_string())?;
         let mut stmt_ptr: *mut ffi::sqlite3_stmt = ptr::null_mut();
         let rc = unsafe {
-            ffi::sqlite3_prepare_v2(self.raw, c_sql.as_ptr(), -1, &mut stmt_ptr, ptr::null_mut())
+            ffi::sqlite3_prepare_v2(
+                self.raw,
+                c_sql.as_ptr(),
+                -1,
+                &raw mut stmt_ptr,
+                ptr::null_mut(),
+            )
         };
         if rc != ffi::SQLITE_OK {
             return Err(self.last_error(rc));
@@ -216,8 +223,8 @@ struct Statement<'conn> {
     stmt: *mut ffi::sqlite3_stmt,
 }
 
-impl<'conn> Statement<'conn> {
-    fn next<'stmt>(&'stmt mut self) -> Result<Option<Row<'stmt>>, String> {
+impl Statement<'_> {
+    fn next(&mut self) -> Result<Option<Row<'_>>, String> {
         let rc = unsafe { ffi::sqlite3_step(self.stmt) };
         match rc {
             ffi::SQLITE_ROW => Ok(Some(Row {
@@ -244,8 +251,23 @@ struct Row<'stmt> {
 }
 
 impl Row<'_> {
-    fn column_type(&self, index: usize) -> i32 {
-        unsafe { ffi::sqlite3_column_type(self.stmt, index as i32) }
+    fn column_index(index: usize) -> Result<i32, String> {
+        i32::try_from(index).map_err(|_| "Column index exceeds SQLite limits".to_string())
+    }
+
+    fn column_details(&self, index: usize) -> Result<(i32, i32), String> {
+        let idx = Self::column_index(index)?;
+        let column_type = unsafe { ffi::sqlite3_column_type(self.stmt, idx) };
+        Ok((idx, column_type))
+    }
+
+    #[allow(clippy::cast_possible_truncation)]
+    fn f64_to_f32(value: f64) -> Result<f32, String> {
+        if value < f64::from(f32::MIN) || value > f64::from(f32::MAX) {
+            Err("SQLite double value out of range for f32".to_string())
+        } else {
+            Ok(value as f32)
+        }
     }
 
     fn get_string(&self, index: usize) -> Result<String, String> {
@@ -254,39 +276,45 @@ impl Row<'_> {
     }
 
     fn get_string_optional(&self, index: usize) -> Result<Option<String>, String> {
-        if self.column_type(index) == ffi::SQLITE_NULL {
+        let (idx, column_type) = self.column_details(index)?;
+        if column_type == ffi::SQLITE_NULL {
             return Ok(None);
         }
-        let text_ptr = unsafe { ffi::sqlite3_column_text(self.stmt, index as i32) };
+        let text_ptr = unsafe { ffi::sqlite3_column_text(self.stmt, idx) };
         if text_ptr.is_null() {
             return Ok(Some(String::new()));
         }
-        let len = unsafe { ffi::sqlite3_column_bytes(self.stmt, index as i32) };
-        let slice = unsafe { slice::from_raw_parts(text_ptr as *const u8, len as usize) };
+        let byte_len = unsafe { ffi::sqlite3_column_bytes(self.stmt, idx) };
+        let len = usize::try_from(byte_len)
+            .map_err(|_| "Negative text length reported by SQLite".to_string())?;
+        let slice = unsafe { slice::from_raw_parts(text_ptr.cast::<u8>(), len) };
         Ok(Some(String::from_utf8_lossy(slice).into_owned()))
     }
 
     fn get_f32(&self, index: usize) -> Result<f32, String> {
-        if self.column_type(index) == ffi::SQLITE_NULL {
+        let (idx, column_type) = self.column_details(index)?;
+        if column_type == ffi::SQLITE_NULL {
             return Err("Unexpected NULL float column".to_string());
         }
-        Ok(unsafe { ffi::sqlite3_column_double(self.stmt, index as i32) } as f32)
+        let value = unsafe { ffi::sqlite3_column_double(self.stmt, idx) };
+        Self::f64_to_f32(value)
     }
 
     fn get_f32_optional(&self, index: usize) -> Result<Option<f32>, String> {
-        if self.column_type(index) == ffi::SQLITE_NULL {
+        let (idx, column_type) = self.column_details(index)?;
+        if column_type == ffi::SQLITE_NULL {
             return Ok(None);
         }
-        Ok(Some(
-            unsafe { ffi::sqlite3_column_double(self.stmt, index as i32) } as f32,
-        ))
+        let value = unsafe { ffi::sqlite3_column_double(self.stmt, idx) };
+        Self::f64_to_f32(value).map(Some)
     }
 
     fn get_u16_optional(&self, index: usize) -> Result<Option<u16>, String> {
-        if self.column_type(index) == ffi::SQLITE_NULL {
+        let (idx, column_type) = self.column_details(index)?;
+        if column_type == ffi::SQLITE_NULL {
             return Ok(None);
         }
-        let value = unsafe { ffi::sqlite3_column_int64(self.stmt, index as i32) };
+        let value = unsafe { ffi::sqlite3_column_int64(self.stmt, idx) };
         let converted = value
             .try_into()
             .map_err(|_| "Value out of range for u16".to_string())?;
@@ -294,19 +322,19 @@ impl Row<'_> {
     }
 
     fn get_i64(&self, index: usize) -> Result<i64, String> {
-        if self.column_type(index) == ffi::SQLITE_NULL {
+        let (idx, column_type) = self.column_details(index)?;
+        if column_type == ffi::SQLITE_NULL {
             return Err("Unexpected NULL integer column".to_string());
         }
-        Ok(unsafe { ffi::sqlite3_column_int64(self.stmt, index as i32) })
+        Ok(unsafe { ffi::sqlite3_column_int64(self.stmt, idx) })
     }
 
     fn get_i64_optional(&self, index: usize) -> Result<Option<i64>, String> {
-        if self.column_type(index) == ffi::SQLITE_NULL {
+        let (idx, column_type) = self.column_details(index)?;
+        if column_type == ffi::SQLITE_NULL {
             return Ok(None);
         }
-        Ok(Some(unsafe {
-            ffi::sqlite3_column_int64(self.stmt, index as i32)
-        }))
+        Ok(Some(unsafe { ffi::sqlite3_column_int64(self.stmt, idx) }))
     }
 }
 
@@ -363,7 +391,7 @@ impl LocalProductDb {
         let products_table = SqlTablesNames::Products.to_string();
         let table_exists = sqlite_con
             .table_exists(&products_table)
-            .unwrap_or_else(|_| panic!("Failed to check table existence for '{}'", products_table));
+            .unwrap_or_else(|_| panic!("Failed to check table existence for '{products_table}'"));
         if !table_exists {
             Self::create_tables(sqlite_con);
         }
@@ -395,7 +423,7 @@ impl LocalProductDb {
                 format!("SELECT name FROM pragma_table_info('{table_name}')").as_str(),
                 |row| row.get_string(0),
             )
-            .unwrap_or_else(|_| panic!("Getting column names of the {} table failed", table_name));
+            .unwrap_or_else(|_| panic!("Getting column names of the {table_name} table failed"));
 
         let mut missing_columns = Vec::new();
         for col_name in db_columns {
@@ -640,11 +668,11 @@ impl Database for LocalProductDb {
 
         let products = self
             .sqlite_con
-            .query_map(&query_template, |row| map_query_row_to_product(row))
+            .query_map(&query_template, map_query_row_to_product)
             .unwrap_or_else(|e| panic!("Failed to map query results: {e}"));
 
         let mut result_map = HashMap::new();
-        result_map.extend(products.into_iter());
+        result_map.extend(products);
         result_map
     }
 
