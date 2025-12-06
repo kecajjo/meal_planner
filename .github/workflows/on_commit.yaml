@@ -16,7 +16,7 @@ jobs:
     name: Build and test
     runs-on: ubuntu-latest
     container:
-      image: jacekmultan/meal-planner-rust:0.2
+      image: jacekmultan/meal-planner-rust:0.3.1
       options: --user 0
     steps:
       - name: Checkout code
