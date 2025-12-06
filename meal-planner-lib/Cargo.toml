@@ -9,13 +9,24 @@ const_format = "0.2.35"
 microlp = "0.2.11"
 strum = "0.27.2"
 strum_macros = "0.27.2"
+futures = "0.3.31"
+once_cell = "1.19.0"
+log = "0.4.22"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+libsqlite3-sys = "0.28.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+sqlite-wasm-rs = { version = "0.4.8", default-features = false, features = [
+    "precompiled",
+] }
 
 [features]
 default = []
 test-utils = []
 
-[target.'cfg(not(all(target_arch = "wasm32", target_os = "emscripten")))'.dependencies]
-rusqlite = "0.37.0"
+# [target.'cfg(not(all(target_arch = "wasm32", target_os = "emscripten")))'.dependencies]
+# rusqlite = "0.37.0"
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }

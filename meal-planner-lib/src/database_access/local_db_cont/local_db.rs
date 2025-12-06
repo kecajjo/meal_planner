@@ -1,6 +1,12 @@
 use core::fmt;
 use core::fmt::Write;
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
+use std::ffi::{CStr, CString};
+use std::marker::PhantomData;
+use std::os::raw::c_void;
+use std::ptr;
+use std::slice;
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::EnumIter;
 
@@ -12,14 +18,300 @@ use crate::database_access::{Database, DbSearchCriteria, MutableDatabase};
 use const_format::concatcp;
 
 // cant make paths relative to this file
-const DATABASE_PATH: &str = "src/database_access/local_db_cont/";
+#[cfg(target_arch = "wasm32")]
+mod platform {
+    use futures::executor::block_on;
+    use sqlite_wasm_rs::sahpool_vfs::{self, OpfsSAHPoolCfg, OpfsSAHPoolUtil};
+    use std::sync::OnceLock;
+
+    pub(super) use sqlite_wasm_rs as ffi;
+    pub(super) const DATABASE_PATH: &str = "";
+
+    static OPFS_VFS_HANDLE: OnceLock<OpfsSAHPoolUtil> = OnceLock::new();
+
+    async fn init_wasm_persistent_storage_with_config(
+        config: OpfsSAHPoolCfg,
+    ) -> Result<&'static OpfsSAHPoolUtil, String> {
+        if let Some(handle) = OPFS_VFS_HANDLE.get() {
+            return Ok(handle);
+        }
+
+        let util = sahpool_vfs::install(&config, true)
+            .await
+            .map_err(|err| err.to_string())?;
+
+        if OPFS_VFS_HANDLE.set(util).is_err() {
+            // Another initializer won the race; drop the unused handle.
+        }
+
+        OPFS_VFS_HANDLE
+            .get()
+            .ok_or_else(|| "OPFS VFS handle not available after initialization".to_string())
+    }
+
+    pub(super) fn wasm_persistent_storage_handle() -> Option<&'static OpfsSAHPoolUtil> {
+        OPFS_VFS_HANDLE.get()
+    }
+
+    async fn init_wasm_persistent_storage() -> Result<&'static OpfsSAHPoolUtil, String> {
+        init_wasm_persistent_storage_with_config(OpfsSAHPoolCfg::default()).await
+    }
+
+    pub(super) fn ensure_wasm_persistent_storage_ready() -> Result<(), String> {
+        if OPFS_VFS_HANDLE.get().is_some() {
+            return Ok(());
+        }
+
+        block_on(async { init_wasm_persistent_storage().await.map(|_| ()) })
+    }
+}
+#[cfg(target_arch = "wasm32")]
+use platform::{DATABASE_PATH, ensure_wasm_persistent_storage_ready, ffi};
+
+#[cfg(not(target_arch = "wasm32"))]
+mod platform {
+    pub(super) use libsqlite3_sys as ffi;
+    pub(super) const DATABASE_PATH: &str = "src/database_access/local_db_cont/";
+}
+#[cfg(not(target_arch = "wasm32"))]
+use platform::{DATABASE_PATH, ffi};
 #[cfg(not(test))]
 pub(crate) const DATABASE_FILENAME: &str = concatcp!(DATABASE_PATH, "local_db.sqlite");
 #[cfg(test)]
 pub(crate) const DATABASE_FILENAME: &str = concatcp!(DATABASE_PATH, "test_local_db.sqlite");
 
+struct SqliteConnection {
+    raw: *mut ffi::sqlite3,
+}
+
+impl SqliteConnection {
+    fn open(path: &str) -> Result<Self, String> {
+        let c_path = CString::new(path)
+            .map_err(|_| "Database path contains interior null byte".to_string())?;
+        let mut db_ptr: *mut ffi::sqlite3 = ptr::null_mut();
+        let flags = ffi::SQLITE_OPEN_CREATE | ffi::SQLITE_OPEN_READWRITE;
+        let rc = unsafe { ffi::sqlite3_open_v2(c_path.as_ptr(), &mut db_ptr, flags, ptr::null()) };
+        if rc != ffi::SQLITE_OK {
+            let message = Self::extract_errmsg(db_ptr, rc);
+            if !db_ptr.is_null() {
+                unsafe {
+                    ffi::sqlite3_close(db_ptr);
+                }
+            }
+            return Err(message);
+        }
+        Ok(Self { raw: db_ptr })
+    }
+
+    fn enable_foreign_keys(&self) -> Result<(), String> {
+        self.execute("PRAGMA foreign_keys = ON;")
+    }
+
+    fn execute(&self, sql: &str) -> Result<(), String> {
+        let c_sql = CString::new(sql).map_err(|_| "SQL contains interior null byte".to_string())?;
+        let rc = unsafe {
+            ffi::sqlite3_exec(
+                self.raw,
+                c_sql.as_ptr(),
+                None,
+                ptr::null_mut::<c_void>(),
+                ptr::null_mut(),
+            )
+        };
+        if rc != ffi::SQLITE_OK {
+            return Err(self.last_error(rc));
+        }
+        Ok(())
+    }
+
+    fn prepare(&self, sql: &str) -> Result<Statement<'_>, String> {
+        let c_sql = CString::new(sql).map_err(|_| "SQL contains interior null byte".to_string())?;
+        let mut stmt_ptr: *mut ffi::sqlite3_stmt = ptr::null_mut();
+        let rc = unsafe {
+            ffi::sqlite3_prepare_v2(self.raw, c_sql.as_ptr(), -1, &mut stmt_ptr, ptr::null_mut())
+        };
+        if rc != ffi::SQLITE_OK {
+            return Err(self.last_error(rc));
+        }
+        Ok(Statement {
+            conn: self,
+            stmt: stmt_ptr,
+        })
+    }
+
+    fn query_map<T, F>(&self, sql: &str, mut mapper: F) -> Result<Vec<T>, String>
+    where
+        F: FnMut(&Row) -> Result<T, String>,
+    {
+        let mut stmt = self.prepare(sql)?;
+        let mut results = Vec::new();
+        while let Some(row) = stmt.next()? {
+            results.push(mapper(&row)?);
+        }
+        Ok(results)
+    }
+
+    fn query_first<T, F>(&self, sql: &str, mut mapper: F) -> Result<Option<T>, String>
+    where
+        F: FnMut(&Row) -> Result<T, String>,
+    {
+        let mut stmt = self.prepare(sql)?;
+        if let Some(row) = stmt.next()? {
+            let value = mapper(&row)?;
+            Ok(Some(value))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn table_exists(&self, table_name: &str) -> Result<bool, String> {
+        let sql = format!(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='{table_name}' LIMIT 1;"
+        );
+        let mut stmt = self.prepare(&sql)?;
+        Ok(stmt.next()?.is_some())
+    }
+
+    fn last_error(&self, code: i32) -> String {
+        let message = unsafe {
+            let msg_ptr = ffi::sqlite3_errmsg(self.raw);
+            if msg_ptr.is_null() {
+                "unknown error".to_string()
+            } else {
+                CStr::from_ptr(msg_ptr).to_string_lossy().into_owned()
+            }
+        };
+        format!("SQLite error {code}: {message}")
+    }
+
+    fn extract_errmsg(db_ptr: *mut ffi::sqlite3, code: i32) -> String {
+        if db_ptr.is_null() {
+            return format!("SQLite error {code}: unknown error");
+        }
+        let message = unsafe {
+            let msg_ptr = ffi::sqlite3_errmsg(db_ptr);
+            if msg_ptr.is_null() {
+                "unknown error".to_string()
+            } else {
+                CStr::from_ptr(msg_ptr).to_string_lossy().into_owned()
+            }
+        };
+        format!("SQLite error {code}: {message}")
+    }
+}
+
+impl Drop for SqliteConnection {
+    fn drop(&mut self) {
+        if !self.raw.is_null() {
+            unsafe {
+                let _ = ffi::sqlite3_close(self.raw);
+            }
+            self.raw = ptr::null_mut();
+        }
+    }
+}
+
+struct Statement<'conn> {
+    conn: &'conn SqliteConnection,
+    stmt: *mut ffi::sqlite3_stmt,
+}
+
+impl<'conn> Statement<'conn> {
+    fn next<'stmt>(&'stmt mut self) -> Result<Option<Row<'stmt>>, String> {
+        let rc = unsafe { ffi::sqlite3_step(self.stmt) };
+        match rc {
+            ffi::SQLITE_ROW => Ok(Some(Row {
+                stmt: self.stmt,
+                _marker: PhantomData,
+            })),
+            ffi::SQLITE_DONE => Ok(None),
+            code => Err(self.conn.last_error(code)),
+        }
+    }
+}
+
+impl Drop for Statement<'_> {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = ffi::sqlite3_finalize(self.stmt);
+        }
+    }
+}
+
+struct Row<'stmt> {
+    stmt: *mut ffi::sqlite3_stmt,
+    _marker: PhantomData<&'stmt ffi::sqlite3_stmt>,
+}
+
+impl Row<'_> {
+    fn column_type(&self, index: usize) -> i32 {
+        unsafe { ffi::sqlite3_column_type(self.stmt, index as i32) }
+    }
+
+    fn get_string(&self, index: usize) -> Result<String, String> {
+        self.get_string_optional(index)
+            .and_then(|opt| opt.ok_or_else(|| "Unexpected NULL text column".to_string()))
+    }
+
+    fn get_string_optional(&self, index: usize) -> Result<Option<String>, String> {
+        if self.column_type(index) == ffi::SQLITE_NULL {
+            return Ok(None);
+        }
+        let text_ptr = unsafe { ffi::sqlite3_column_text(self.stmt, index as i32) };
+        if text_ptr.is_null() {
+            return Ok(Some(String::new()));
+        }
+        let len = unsafe { ffi::sqlite3_column_bytes(self.stmt, index as i32) };
+        let slice = unsafe { slice::from_raw_parts(text_ptr as *const u8, len as usize) };
+        Ok(Some(String::from_utf8_lossy(slice).into_owned()))
+    }
+
+    fn get_f32(&self, index: usize) -> Result<f32, String> {
+        if self.column_type(index) == ffi::SQLITE_NULL {
+            return Err("Unexpected NULL float column".to_string());
+        }
+        Ok(unsafe { ffi::sqlite3_column_double(self.stmt, index as i32) } as f32)
+    }
+
+    fn get_f32_optional(&self, index: usize) -> Result<Option<f32>, String> {
+        if self.column_type(index) == ffi::SQLITE_NULL {
+            return Ok(None);
+        }
+        Ok(Some(
+            unsafe { ffi::sqlite3_column_double(self.stmt, index as i32) } as f32,
+        ))
+    }
+
+    fn get_u16_optional(&self, index: usize) -> Result<Option<u16>, String> {
+        if self.column_type(index) == ffi::SQLITE_NULL {
+            return Ok(None);
+        }
+        let value = unsafe { ffi::sqlite3_column_int64(self.stmt, index as i32) };
+        let converted = value
+            .try_into()
+            .map_err(|_| "Value out of range for u16".to_string())?;
+        Ok(Some(converted))
+    }
+
+    fn get_i64(&self, index: usize) -> Result<i64, String> {
+        if self.column_type(index) == ffi::SQLITE_NULL {
+            return Err("Unexpected NULL integer column".to_string());
+        }
+        Ok(unsafe { ffi::sqlite3_column_int64(self.stmt, index as i32) })
+    }
+
+    fn get_i64_optional(&self, index: usize) -> Result<Option<i64>, String> {
+        if self.column_type(index) == ffi::SQLITE_NULL {
+            return Ok(None);
+        }
+        Ok(Some(unsafe {
+            ffi::sqlite3_column_int64(self.stmt, index as i32)
+        }))
+    }
+}
+
 pub(crate) struct LocalProductDb {
-    sqlite_con: rusqlite::Connection,
+    sqlite_con: SqliteConnection,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, EnumIter)]
@@ -44,24 +336,35 @@ impl fmt::Display for SqlTablesNames {
 
 // TODO panicking to be replaced with proper error handling
 impl LocalProductDb {
+    /// Creates a SQLite-backed product database.
+    ///
+    /// On wasm targets the first invocation triggers asynchronous OPFS initialisation;
+    /// callers should await `init_wasm_persistent_storage` early or retry after it
+    /// resolves to ensure a connection can be opened.
     pub fn new(database_file: &str) -> Option<Self> {
-        let con = rusqlite::Connection::open(database_file).ok()?;
-        if con.execute("PRAGMA foreign_keys = ON;", []).is_err() {
+        #[cfg(target_arch = "wasm32")]
+        {
+            if let Err(err) = ensure_wasm_persistent_storage_ready() {
+                // Propagate failure as None while preserving panic-free behaviour.
+                log::error!("Failed to initialise OPFS storage: {err}");
+                return None;
+            }
+        }
+
+        let con = SqliteConnection::open(database_file).ok()?;
+        if con.enable_foreign_keys().is_err() {
             return None;
         }
         Self::init_db_if_new_created(&con);
         Some(LocalProductDb { sqlite_con: con })
     }
 
-    fn init_db_if_new_created(sqlite_con: &rusqlite::Connection) {
-        let mut stmt = sqlite_con
-            .prepare(&format!(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='{}';",
-                SqlTablesNames::Products
-            ))
-            .expect("Failed to prepare statement");
-        let mut rows = stmt.query([]).expect("Failed to execute query");
-        if rows.next().expect("Failed to fetch row").is_none() {
+    fn init_db_if_new_created(sqlite_con: &SqliteConnection) {
+        let products_table = SqlTablesNames::Products.to_string();
+        let table_exists = sqlite_con
+            .table_exists(&products_table)
+            .unwrap_or_else(|_| panic!("Failed to check table existence for '{}'", products_table));
+        if !table_exists {
             Self::create_tables(sqlite_con);
         }
     }
@@ -86,18 +389,16 @@ impl LocalProductDb {
             ),
         };
 
-        let mut stmt = self
+        let db_columns = self
             .sqlite_con
-            .prepare(format!("SELECT name FROM pragma_table_info('{table_name}')").as_str())
-            .unwrap_or_else(|_| panic!("Getting columns names of the {table_name} table failed"));
-
-        let db_column_iter = stmt
-            .query_map([], |row| row.get::<_, String>(0))
-            .expect("Failed to map column names");
+            .query_map(
+                format!("SELECT name FROM pragma_table_info('{table_name}')").as_str(),
+                |row| row.get_string(0),
+            )
+            .unwrap_or_else(|_| panic!("Getting column names of the {} table failed", table_name));
 
         let mut missing_columns = Vec::new();
-        for col_result in db_column_iter {
-            let col_name = col_result.expect("Failed to get column name");
+        for col_name in db_columns {
             if !all_columns.contains(&col_name) {
                 missing_columns.push(col_name);
             }
@@ -111,7 +412,7 @@ impl LocalProductDb {
             let alter_table_query =
                 format!("ALTER TABLE {table_name} ADD COLUMN \"{col}\" {col_type};");
             self.sqlite_con
-                .execute(alter_table_query.as_str(), [])
+                .execute(alter_table_query.as_str())
                 .map_err(|e| {
                     format!("Failed to add column '{col}' to table '{table_name}': {e}")
                 })?;
@@ -120,7 +421,7 @@ impl LocalProductDb {
         Ok(())
     }
 
-    fn create_tables(sqlite_con: &rusqlite::Connection) {
+    fn create_tables(sqlite_con: &SqliteConnection) {
         sqlite_con
             .execute(
                 format!(
@@ -132,7 +433,6 @@ impl LocalProductDb {
                     SqlTablesNames::Products
                 )
                 .as_str(),
-                [],
             )
             .unwrap_or_else(|_| panic!("Failed to create '{}' table", SqlTablesNames::Products));
 
@@ -186,24 +486,21 @@ impl LocalProductDb {
     }
 
     fn create_table_for_table_name(
-        sqlite_con: &rusqlite::Connection,
+        sqlite_con: &SqliteConnection,
         table_name: &str,
         data: &str,
     ) -> Result<(), String> {
         sqlite_con
-            .execute(
-                &format!(
-                    "CREATE TABLE {} (
+            .execute(&format!(
+                "CREATE TABLE {} (
                         id TEXT NOT NULL PRIMARY KEY,
                         {}
                         FOREIGN KEY(id) REFERENCES {}(id) ON DELETE CASCADE
                     )",
-                    table_name,
-                    data,
-                    SqlTablesNames::Products
-                ),
-                [],
-            )
+                table_name,
+                data,
+                SqlTablesNames::Products
+            ))
             .map_err(|e| format!("Failed to create '{table_name}' table: {e}"))?;
         Ok(())
     }
@@ -235,69 +532,45 @@ fn db_search_criteria_to_sql_query_fragment(
     Ok(query_fragment)
 }
 
-fn map_query_row_to_product(row: &rusqlite::Row) -> (String, Product) {
-    enum SelectColumnIndexToProductData {
-        Id = 0,
-        Name = 1,
-        Brand = 2,
-        MacroElementsStart = 3,
-        // -1 because Calories are not to be inside DB
-        MicroNutrientsStart = 3 + MacroElementsType::COUNT as isize - 1,
-        // -1 because Calories are not to be inside DB
-        AllowedUnitsStart =
-            3 + MacroElementsType::COUNT as isize + MicroNutrientsType::COUNT as isize - 1,
+fn map_query_row_to_product(row: &Row) -> Result<(String, Product), String> {
+    let id = row.get_string(0)?;
+    let name = row.get_string(1)?;
+    let brand = row.get_string_optional(2)?;
+
+    let mut offset = 3;
+
+    let mut macro_values = Vec::with_capacity(MacroElementsType::COUNT - 1);
+    for macro_type in MacroElementsType::iter() {
+        if macro_type == MacroElementsType::Calories {
+            continue;
+        }
+        macro_values.push(row.get_f32(offset)?);
+        offset += 1;
     }
-
-    let name = row.get_unwrap(SelectColumnIndexToProductData::Name as usize);
-    let brand = row.get_unwrap(SelectColumnIndexToProductData::Brand as usize);
-
-    let mut iter_macroelems = MacroElementsType::iter().map(|m| {
-        row.get_unwrap((SelectColumnIndexToProductData::MacroElementsStart as usize) + (m as usize))
-    });
-    // the last item is Calories, which is computed, so we skip it
+    if macro_values.len() != 5 {
+        return Err("Unexpected number of macro nutrient columns".to_string());
+    }
     let macro_elems = MacroElements::new(
-        iter_macroelems.next().unwrap(),
-        iter_macroelems.next().unwrap(),
-        iter_macroelems.next().unwrap(),
-        iter_macroelems.next().unwrap(),
-        iter_macroelems.next().unwrap(),
+        macro_values[0],
+        macro_values[1],
+        macro_values[2],
+        macro_values[3],
+        macro_values[4],
     );
 
-    let iter_micronutrients = MicroNutrientsType::iter().map(|m| {
-        row.get_unwrap(
-            (SelectColumnIndexToProductData::MicroNutrientsStart as usize) + (m as usize),
-        )
-    });
-    let mut micronutrients = MicroNutrients::default();
-    for (m_type, value) in MicroNutrientsType::iter().zip(iter_micronutrients) {
-        micronutrients[m_type] = value;
+    let mut micronutrients = Box::new(MicroNutrients::default());
+    for micro_type in MicroNutrientsType::iter() {
+        micronutrients[micro_type] = row.get_f32_optional(offset)?;
+        offset += 1;
     }
 
-    let iter_allowed_units = AllowedUnitsType::iter().map(|u| {
-        row.get_unwrap(
-            (SelectColumnIndexToProductData::AllowedUnitsStart as usize) + (2 * u as usize),
-        )
-    });
-    let iter_allowed_units_div = AllowedUnitsType::iter().map(|u| {
-        row.get_unwrap(
-            (SelectColumnIndexToProductData::AllowedUnitsStart as usize) + (2 * u as usize + 1),
-        )
-    });
     let mut allowed_units: AllowedUnits = HashMap::new();
-    for ((unit, quantity), divider) in AllowedUnitsType::iter()
-        .zip(iter_allowed_units)
-        .zip(iter_allowed_units_div)
-    {
-        if let Some(qty) = quantity
-            && let Some(div) = divider
-        {
-            allowed_units.insert(
-                unit,
-                UnitData {
-                    amount: qty,
-                    divider: div,
-                },
-            );
+    for unit in AllowedUnitsType::iter() {
+        let quantity = row.get_u16_optional(offset)?;
+        let divider = row.get_u16_optional(offset + 1)?;
+        offset += 2;
+        if let (Some(amount), Some(divider)) = (quantity, divider) {
+            allowed_units.insert(unit, UnitData { amount, divider });
         }
     }
 
@@ -305,13 +578,10 @@ fn map_query_row_to_product(row: &rusqlite::Row) -> (String, Product) {
         name,
         brand,
         Box::new(macro_elems),
-        Box::new(micronutrients),
+        micronutrients,
         allowed_units,
     );
-    (
-        row.get_unwrap(SelectColumnIndexToProductData::Id as usize),
-        product,
-    )
+    Ok((id, product))
 }
 
 impl Database for LocalProductDb {
@@ -368,18 +638,13 @@ impl Database for LocalProductDb {
         );
         query_template.push(';');
 
-        let mut stmt = self
+        let products = self
             .sqlite_con
-            .prepare(&query_template)
-            .expect("Failed to prepare statement");
+            .query_map(&query_template, |row| map_query_row_to_product(row))
+            .unwrap_or_else(|e| panic!("Failed to map query results: {e}"));
 
         let mut result_map = HashMap::new();
-        let product_iter = stmt
-            .query_map([], |row| Ok(map_query_row_to_product(row)))
-            .expect("Failed to map query results")
-            .map(|res| res.expect("Failed to map row to product"));
-
-        result_map.extend(product_iter);
+        result_map.extend(products.into_iter());
         result_map
     }
 
@@ -399,7 +664,7 @@ impl Database for LocalProductDb {
             product_id
         );
         self.sqlite_con
-            .execute(update_query.as_str(), [])
+            .execute(update_query.as_str())
             .map_err(|e| {
                 format!(
                     "Failed to update allowed unit {allowed_unit} for product {product_id}: {e}"
@@ -418,10 +683,9 @@ impl MutableDatabase for LocalProductDb {
                          values_str: &str|
          -> Result<(), String> {
             self.sqlite_con
-                .execute(
-                    &format!("INSERT INTO {table_name} ({columns_str}) VALUES ({values_str});"),
-                    [],
-                )
+                .execute(&format!(
+                    "INSERT INTO {table_name} ({columns_str}) VALUES ({values_str});"
+                ))
                 .map_err(|e| {
                     format!("Failed to insert product '{product_id}' into {table_name} table: {e}")
                 })?;
@@ -532,10 +796,9 @@ impl MutableDatabase for LocalProductDb {
     fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         let run_query = |table: &str, col: &str, val: &str| {
             self.sqlite_con
-                .execute(
-                    &format!("UPDATE {table} SET \"{col}\" = {val} where id = '{product_id}';"),
-                    [],
-                )
+                .execute(&format!(
+                    "UPDATE {table} SET \"{col}\" = {val} where id = '{product_id}';"
+                ))
                 .unwrap_or_else(|_| panic!("Failed to update {col} for {product_id}"));
         };
 
@@ -611,7 +874,6 @@ impl MutableDatabase for LocalProductDb {
                     "DELETE FROM {main_table_name} WHERE id = '{product_id}';"
                 )
                 .as_str(),
-                [],
             )
             .map_err(|e| {
                 format!(
@@ -631,7 +893,6 @@ mod tests {
     };
     use crate::database_access::{Database, DbSearchCriteria, MutableDatabase};
     use approx::assert_relative_eq;
-    use rusqlite::{Connection, params};
     use std::collections::HashMap;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -640,24 +901,29 @@ mod tests {
     #[allow(unused_imports)]
     use strum::IntoEnumIterator;
 
-    fn assert_table_columns(connection: &Connection, table: &str, expected_columns: &[String]) {
-        let count: i64 = connection
-            .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1;",
-                [table],
-                |row| row.get(0),
+    fn assert_table_columns(
+        connection: &SqliteConnection,
+        table: &str,
+        expected_columns: &[String],
+    ) {
+        let count = connection
+            .query_first(
+                format!(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='{table}';"
+                )
+                .as_str(),
+                |row| row.get_i64(0),
             )
-            .expect("Failed to check table existence");
+            .expect("Failed to check table existence")
+            .unwrap_or(0);
         assert!(count > 0, "Expected '{table}' table to exist");
 
-        let mut stmt = connection
-            .prepare(&format!("SELECT name FROM pragma_table_info('{table}');"))
-            .expect("Failed to prepare pragma_table_info statement");
-        let columns: Vec<String> = stmt
-            .query_map([], |row| row.get::<_, String>(0))
-            .expect("Failed to read table columns")
-            .map(|res| res.expect("Failed to extract column name"))
-            .collect();
+        let columns = connection
+            .query_map(
+                format!("SELECT name FROM pragma_table_info('{table}');").as_str(),
+                |row| row.get_string(0),
+            )
+            .expect("Failed to read table columns");
 
         assert_eq!(
             columns, expected_columns,
@@ -690,7 +956,8 @@ mod tests {
 
         assert!(db_path.exists(), "Expected SQLite file to be created");
 
-        let connection = Connection::open(&db_path).expect("Failed to open created database");
+        let connection = SqliteConnection::open(&db_path.to_string_lossy())
+            .expect("Failed to open created database");
 
         let mut macro_columns = vec!["id".to_string()];
         macro_columns.extend(
@@ -790,8 +1057,13 @@ mod tests {
             Ok(guard)
         }
 
-        fn connection(&self) -> Connection {
-            Connection::open(&self.path).expect("Failed to reopen test database")
+        fn connection(&self) -> SqliteConnection {
+            SqliteConnection::open(
+                self.path
+                    .to_str()
+                    .expect("Database path contains invalid UTF-8"),
+            )
+            .expect("Failed to reopen test database")
         }
 
         fn local_db(&self) -> LocalProductDb {
@@ -993,17 +1265,18 @@ mod tests {
     fn test_02_initialize_and_seed_database() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let conn = test_db.connection();
-        let product_count: i64 = conn
-            .query_row("SELECT COUNT(*) FROM products;", [], |row| row.get(0))
-            .expect("Failed to count products");
+        let product_count = conn
+            .query_first("SELECT COUNT(*) FROM products;", |row| row.get_i64(0))
+            .expect("Failed to count products")
+            .expect("Missing count row");
         assert_eq!(product_count, 2);
-        let macro_columns: i64 = conn
-            .query_row(
+        let macro_columns = conn
+            .query_first(
                 "SELECT COUNT(*) FROM pragma_table_info('macro_elements');",
-                [],
-                |row| row.get(0),
+                |row| row.get_i64(0),
             )
-            .expect("Failed to count macro columns");
+            .expect("Failed to count macro columns")
+            .expect("Missing macro columns row");
         assert_eq!(macro_columns, 6);
     }
 
@@ -1042,22 +1315,22 @@ mod tests {
         );
         assert!(result.is_ok());
         let conn = test_db.connection();
-        let updated: Option<u16> = conn
-            .query_row(
-                "SELECT cup FROM allowed_units WHERE id = ?1;",
-                params!["Apple (BrandA)"],
-                |row| row.get(0),
+        let updated = conn
+            .query_first(
+                "SELECT cup FROM allowed_units WHERE id = 'Apple (BrandA)';",
+                |row| row.get_u16_optional(0),
             )
-            .expect("Failed to fetch updated unit");
+            .expect("Failed to fetch updated unit")
+            .expect("Missing cup value");
         assert_eq!(updated, Some(3));
-        let updated2: Option<u16> = conn
-            .query_row(
-                "SELECT \"cup divider\" FROM allowed_units WHERE id = ?1;",
-                params!["Apple (BrandA)"],
-                |row| row.get(0),
+        let updated_div = conn
+            .query_first(
+                "SELECT \"cup divider\" FROM allowed_units WHERE id = 'Apple (BrandA)';",
+                |row| row.get_u16_optional(0),
             )
-            .expect("Failed to fetch updated unit");
-        assert_eq!(updated2, Some(2));
+            .expect("Failed to fetch updated divider")
+            .expect("Missing cup divider");
+        assert_eq!(updated_div, Some(2));
     }
 
     #[test]
@@ -1090,17 +1363,17 @@ mod tests {
         );
         let new_id = new_product.id();
         assert!(
-            db.add_product(new_id.as_str(), new_product.clone()).is_ok(),
+            db.add_product(new_id.as_str(), new_product).is_ok(),
             "Expected add_product to succeed"
         );
         let conn = test_db.connection();
-        let product_count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM products WHERE id = ?1;",
-                params![new_id],
-                |row| row.get(0),
+        let product_count = conn
+            .query_first(
+                format!("SELECT COUNT(*) FROM products WHERE id = '{new_id}';").as_str(),
+                |row| row.get_i64(0),
             )
-            .expect("Failed to verify inserted product");
+            .expect("Failed to verify inserted product")
+            .expect("Missing product count");
         assert_eq!(product_count, 1);
     }
 
@@ -1140,13 +1413,13 @@ mod tests {
             "Expected update_product to succeed"
         );
         let conn = test_db.connection();
-        let fiber: Option<f32> = conn
-            .query_row(
-                "SELECT Fiber FROM micronutrients WHERE id = ?1;",
-                params!["Apple (BrandA)"],
-                |row| row.get(0),
+        let fiber = conn
+            .query_first(
+                "SELECT Fiber FROM micronutrients WHERE id = 'Apple (BrandA)';",
+                |row| row.get_f32_optional(0),
             )
-            .expect("Failed to fetch updated fiber");
+            .expect("Failed to fetch updated fiber")
+            .expect("Missing fiber value");
         assert_eq!(fiber, Some(3.0_f32));
     }
 
@@ -1159,13 +1432,13 @@ mod tests {
             "Expected delete_product to succeed"
         );
         let conn = test_db.connection();
-        let count: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM products WHERE id = ?1;",
-                params!["Banana"],
-                |row| row.get(0),
+        let count = conn
+            .query_first(
+                "SELECT COUNT(*) FROM products WHERE id = 'Banana';",
+                |row| row.get_i64(0),
             )
-            .expect("Failed to check product deletion");
+            .expect("Failed to check product deletion")
+            .expect("Missing count value");
         assert_eq!(count, 0);
     }
 
