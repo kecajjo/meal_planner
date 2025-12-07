@@ -16,7 +16,7 @@ jobs:
     name: Build and test
     runs-on: ubuntu-latest
     container:
-      image: jacekmultan/meal-planner-rust:0.3.1
+      image: jacekmultan/meal-planner-rust:0.3.2
       options: --user 0
     steps:
       - name: Checkout code
@@ -31,3 +31,34 @@ jobs:
         run: cargo test --workspace --all-targets --features test-utils
       - name: Format
         run: cargo fmt --all -- --check
+      - name: build dioxus windows app
+        run: dx build --platform windows -p meal-planner-app
+      - name: build dioxus linux app
+        run: dx build --platform linux -p meal-planner-app
+      - name: build dioxus android app
+        run: dx build --platform android -p meal-planner-app
+      - name: build dioxus web app
+        run: dx build --platform web -p meal-planner-app
+
+  build-windows:
+    name: Build Windows App
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-pc-windows-gnu
+          profile: minimal
+          override: true
+      - name: Install Dioxus CLI
+        run: cargo install dioxus-cli
+      - name: Build with Dioxus CLI
+        run: dx build --platform windows -p meal-planner-app
+      - name: Upload Windows binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: meal-planner-app-windows
+          path: target/windows/debug/meal-planner-app.exe
