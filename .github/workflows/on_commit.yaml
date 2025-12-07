@@ -16,7 +16,7 @@ jobs:
     name: Build and test
     runs-on: [self-hosted, dioxus, linux]
     container:
-      image: jacekmultan/meal-planner-rust:0.3.2
+      image: jacekmultan/meal-planner-rust:0.3.4
       options: --user 0
     steps:
       - name: Checkout code
@@ -42,6 +42,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: metadata
+        run: cargo metadata
       - name: build dioxus windows app
         run: dx build --platform windows -p meal-planner-app
 

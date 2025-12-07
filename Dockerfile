@@ -23,22 +23,6 @@ USER root
 
     RUN sudo apt-get update && sudo apt-get install -y binaryen && \
 	rm -rf /var/lib/apt/lists/*
-    
-
-USER developer
-    RUN rustup component add clippy && \
-	    cargo install wasm-opt && \
-        rustup target add \
-	    wasm32-unknown-unknown \
-    	aarch64-linux-android \
-        i686-linux-android \
-        armv7-linux-androideabi \
-        x86_64-linux-android
-
-    # Install cargo-binstall 
-    RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-
-    RUN cargo binstall dioxus-cli --force
 
 USER root
     # Install Android SDK & NDK
@@ -68,6 +52,23 @@ USER root
 USER developer
     RUN mkdir -p /home/developer/repo
     WORKDIR /home/developer/repo
+
+    RUN rustup default stable && \
+        rustup component add clippy && \
+	cargo install wasm-opt && \
+        rustup target add \
+	wasm32-unknown-unknown \
+    	aarch64-linux-android \
+        i686-linux-android \
+        armv7-linux-androideabi \
+        x86_64-linux-android \
+        x86_64-unknown-linux-gnu
+
+    # Install cargo-binstall 
+    RUN curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
+    RUN cargo binstall dioxus-cli --force
+
     ENV PATH="/usr/local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:$PATH"
 
     RUN avdmanager create avd -n mobile -k "system-images;android-33;google_apis;x86_64" --device "pixel"
@@ -128,12 +129,19 @@ RUN cat << EOF >> /home/developer/.profile
 export ANDROID_HOME=/opt/android-sdk
 export ANDROID_NDK_HOME=/opt/android-sdk/ndk/25.2.9519653
 export JAVA_HOME=/usr/lib/jvm/default-java
-export PATH="/usr/local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:\$PATH"
+export PATH="/usr/local/cargo/bin:/usr/local/bin:/home/developer/.local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:\$PATH"
 EOF
 
 RUN chown developer:developer /home/developer/.profile
 
 USER developer
+RUN mkdir -p /home/developer/.rustup/
+RUN cat << EOF >> /home/developer/.rustup/settings.toml
+version = "12"
+default_toolchain = "stable-x86_64-unknown-linux-gnu"
+
+[overrides]
+EOF
 WORKDIR /home/developer/repo
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
