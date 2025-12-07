@@ -36,4 +36,4 @@ docker run --rm \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v "$HOME/.Xauthority:/home/developer/.Xauthority" \
     -v "$scriptDir:/home/developer/repo" \
-    -it $image_name:$version /bin/bash
+    -it $image_name:$version

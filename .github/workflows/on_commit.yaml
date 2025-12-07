@@ -16,12 +16,17 @@ jobs:
     name: Build and test
     runs-on: [self-hosted, dioxus, linux]
     container:
+<<<<<<< HEAD
       image: jacekmultan/meal-planner-rust:0.4.3
       options: --user 1000
     env:
       HOME: /home/developer
       RUSTUP_HOME: /home/developer/.rustup
       CARGO_HOME: /home/developer/.cargo
+=======
+      image: jacekmultan/meal-planner-rust:0.3.2
+      options: --user 0
+>>>>>>> 5914270 (WIP dioxus hello word)
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,8 +38,13 @@ jobs:
         run: cargo test --workspace --all-targets --features test-utils
       - name: Format
         run: cargo fmt --all -- --check
+<<<<<<< HEAD
       - name: cargo metadata
         run: cargo metadata
+=======
+      - name: build dioxus windows app
+        run: dx build --platform windows -p meal-planner-app
+>>>>>>> 5914270 (WIP dioxus hello word)
       - name: build dioxus linux app
         run: dx build --platform linux -p meal-planner-app
       - name: build dioxus android app
@@ -44,6 +54,7 @@ jobs:
 
   build-windows:
     name: Build Windows App
+<<<<<<< HEAD
     runs-on: [self-hosted, dioxus, windows]
     steps:
       - name: Checkout repository
@@ -53,3 +64,25 @@ jobs:
       - name: build dioxus windows app
         run: dx build --platform windows -p meal-planner-app
 
+=======
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-pc-windows-gnu
+          profile: minimal
+          override: true
+      - name: Install Dioxus CLI
+        run: cargo install dioxus-cli
+      - name: Build with Dioxus CLI
+        run: dx build --platform windows -p meal-planner-app
+      - name: Upload Windows binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: meal-planner-app-windows
+          path: target/windows/debug/meal-planner-app.exe
+>>>>>>> 5914270 (WIP dioxus hello word)

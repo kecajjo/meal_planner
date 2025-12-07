@@ -88,6 +88,7 @@ USER developer
     RUN avdmanager create avd -n mobile -k "system-images;android-33;google_apis;x86_64" --device "pixel"
 
     WORKDIR /home/developer/repo
+    ENV PATH="/usr/local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:$PATH"
 
 USER root
 # Write a readable entrypoint.sh with heredoc
