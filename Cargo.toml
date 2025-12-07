@@ -1,6 +1,6 @@
 [workspace]
 members = [
     "meal-planner-app",
-    "meal-planner-lib", "meal-planner-app",
+    "meal-planner-lib",
 ]
 resolver = "3"
