@@ -16,11 +16,28 @@ jobs:
     name: Build and test
     runs-on: [self-hosted, dioxus, linux]
     container:
-      image: jacekmultan/meal-planner-rust:0.3.4
-      options: --user 0
+      image: jacekmultan/meal-planner-rust:0.4.1
+      options: --user 1000
+    defaults:
+      run:
+        shell: bash
+        working-directory: /home/developer/repo
+    env:
+      HOME: /home/developer
+      RUSTUP_HOME: /home/developer/.rustup
+      CARGO_HOME: /home/developer/.cargo
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: whoami
+        run: whoami
+      - name: path
+        run: echo $PATH
+      - name: rustup
+        run: |
+          echo "HOME=$HOME"
+          echo "RUSTUP_HOME=$RUSTUP_HOME"
+          echo "CARGO_HOME=$CARGO_HOME"
       - name: Check
         run: cargo check --workspace --all-targets --verbose
       - name: Clippy
@@ -29,6 +46,8 @@ jobs:
         run: cargo test --workspace --all-targets --features test-utils
       - name: Format
         run: cargo fmt --all -- --check
+      - name: cargo metadata
+        run: cargo metadata
       - name: build dioxus linux app
         run: dx build --platform linux -p meal-planner-app
       - name: build dioxus android app

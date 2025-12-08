@@ -1,10 +1,6 @@
-FROM rust:trixie
+FROM ubuntu:24.04
 
 USER root
-    RUN useradd -m developer && \
-        echo "developer:123" | chpasswd && \
-        adduser developer sudo
-
     RUN apt-get update && apt-get install -y \
         sudo \
         git \
@@ -17,14 +13,29 @@ USER root
         libglib2.0-dev \
         default-jdk \
         unzip \
-        wget && \
-        rustup component add rustfmt && \
+        wget \
+        curl \
+        build-essential \
+        gcc \
+        g++ \
+        make && \
         rm -rf /var/lib/apt/lists/*
 
-    RUN sudo apt-get update && sudo apt-get install -y binaryen && \
-	rm -rf /var/lib/apt/lists/*
+    # Move ubuntu user and group to 1010 (only if it exists)
+    RUN if id ubuntu 2>/dev/null; then \
+          usermod -u 1010 ubuntu && groupmod -g 1010 ubuntu; \
+        fi
 
-USER root
+    RUN useradd -m developer && \
+        echo "developer:123" | chpasswd && \
+        adduser developer sudo
+
+    # Set developer user and group to 1000
+    RUN usermod -u 1000 developer && groupmod -g 1000 developer
+
+    RUN apt-get update && sudo apt-get install -y binaryen && \
+        rm -rf /var/lib/apt/lists/*
+
     # Install Android SDK & NDK
     RUN mkdir -p /opt/android-sdk/cmdline-tools/latest && \
         wget -O /tmp/commandlinetools.zip https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip && \
@@ -39,26 +50,29 @@ USER root
         "emulator" \
         "system-images;android-33;google_apis;x86_64"
 
-    RUN chown -R developer:developer /opt/android-sdk && \
-        chmod -R a+rwX /opt/android-sdk
-
     # Install dependencies
     RUN apt-get update && apt-get install -y \
         qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils \
         libgl1-mesa-dev \
         && rm -rf /var/lib/apt/lists/*
 
+    RUN chown -R developer:developer /opt/android-sdk && \
+        chmod -R a+rwX /opt/android-sdk
         
+
 USER developer
     RUN mkdir -p /home/developer/repo
-    WORKDIR /home/developer/repo
+    # Install Rust and targets
+    RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    ENV PATH="/home/developer/.cargo/bin:${PATH}"
 
     RUN rustup default stable && \
+        rustup component add rustfmt && \
         rustup component add clippy && \
-	cargo install wasm-opt && \
+        cargo install wasm-opt && \
         rustup target add \
-	wasm32-unknown-unknown \
-    	aarch64-linux-android \
+        wasm32-unknown-unknown \
+        aarch64-linux-android \
         i686-linux-android \
         armv7-linux-androideabi \
         x86_64-linux-android \
@@ -72,6 +86,8 @@ USER developer
     ENV PATH="/usr/local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:$PATH"
 
     RUN avdmanager create avd -n mobile -k "system-images;android-33;google_apis;x86_64" --device "pixel"
+
+    WORKDIR /home/developer/repo
 
 USER root
 # Write a readable entrypoint.sh with heredoc
@@ -129,19 +145,21 @@ RUN cat << EOF >> /home/developer/.profile
 export ANDROID_HOME=/opt/android-sdk
 export ANDROID_NDK_HOME=/opt/android-sdk/ndk/25.2.9519653
 export JAVA_HOME=/usr/lib/jvm/default-java
-export PATH="/usr/local/cargo/bin:/usr/local/bin:/home/developer/.local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:\$PATH"
+export CARGO_HOME=/home/developer/.cargo
+export RUSTUP_HOME=/home/developer/.rustup
+export PATH="/usr/local/cargo/bin:/home/developer/.cargo/bin:/usr/local/bin:/home/developer/.local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:\$PATH"
 EOF
+
+ENV PATH="/usr/local/cargo/bin:/home/developer/.cargo/bin:/usr/local/bin:/home/developer/.local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:$PATH"
+ENV ANDROID_HOME=/opt/android-sdk
+ENV ANDROID_NDK_HOME=/opt/android-sdk/ndk/25.2.9519653
+ENV JAVA_HOME=/usr/lib/jvm/default-java
+ENV CARGO_HOME=/home/developer/.cargo
+ENV RUSTUP_HOME=/home/developer/.rustup
 
 RUN chown developer:developer /home/developer/.profile
 
 USER developer
-RUN mkdir -p /home/developer/.rustup/
-RUN cat << EOF >> /home/developer/.rustup/settings.toml
-version = "12"
-default_toolchain = "stable-x86_64-unknown-linux-gnu"
-
-[overrides]
-EOF
 WORKDIR /home/developer/repo
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
