@@ -18,10 +18,6 @@ jobs:
     container:
       image: jacekmultan/meal-planner-rust:0.4.1
       options: --user 1000
-    defaults:
-      run:
-        shell: bash
-        working-directory: /home/developer/repo
     env:
       HOME: /home/developer
       RUSTUP_HOME: /home/developer/.rustup
