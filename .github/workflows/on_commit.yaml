@@ -25,15 +25,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: whoami
-        run: whoami
-      - name: path
-        run: echo $PATH
-      - name: rustup
-        run: |
-          echo "HOME=$HOME"
-          echo "RUSTUP_HOME=$RUSTUP_HOME"
-          echo "CARGO_HOME=$CARGO_HOME"
       - name: Check
         run: cargo check --workspace --all-targets --verbose
       - name: Clippy
