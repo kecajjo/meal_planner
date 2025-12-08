@@ -14,10 +14,14 @@ on:
 jobs:
   build:
     name: Build and test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, dioxus, linux]
     container:
-      image: jacekmultan/meal-planner-rust:0.2
-      options: --user 0
+      image: jacekmultan/meal-planner-rust:0.4.3
+      options: --user 1000
+    env:
+      HOME: /home/developer
+      RUSTUP_HOME: /home/developer/.rustup
+      CARGO_HOME: /home/developer/.cargo
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,9 +29,27 @@ jobs:
         run: cargo check --workspace --all-targets --verbose
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Build
-        run: cargo build --workspace --all-targets --features test-utils
       - name: Test
         run: cargo test --workspace --all-targets --features test-utils
       - name: Format
         run: cargo fmt --all -- --check
+      - name: cargo metadata
+        run: cargo metadata
+      - name: build dioxus linux app
+        run: dx build --platform linux -p meal-planner-app
+      - name: build dioxus android app
+        run: dx build --platform android -p meal-planner-app
+      - name: build dioxus web app
+        run: dx build --platform web -p meal-planner-app
+
+  build-windows:
+    name: Build Windows App
+    runs-on: [self-hosted, dioxus, windows]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: metadata
+        run: cargo metadata
+      - name: build dioxus windows app
+        run: dx build --platform windows -p meal-planner-app
+
