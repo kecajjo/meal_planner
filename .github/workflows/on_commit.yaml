@@ -16,7 +16,7 @@ jobs:
     name: Build and test
     runs-on: [self-hosted, dioxus, linux]
     container:
-      image: jacekmultan/meal-planner-rust:0.4.1
+      image: jacekmultan/meal-planner-rust:0.4.3
       options: --user 1000
     env:
       HOME: /home/developer
@@ -25,15 +25,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: whoami
-        run: whoami
-      - name: path
-        run: echo $PATH
-      - name: rustup
-        run: |
-          echo "HOME=$HOME"
-          echo "RUSTUP_HOME=$RUSTUP_HOME"
-          echo "CARGO_HOME=$CARGO_HOME"
       - name: Check
         run: cargo check --workspace --all-targets --verbose
       - name: Clippy

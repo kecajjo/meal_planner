@@ -150,6 +150,17 @@ export RUSTUP_HOME=/home/developer/.rustup
 export PATH="/usr/local/cargo/bin:/home/developer/.cargo/bin:/usr/local/bin:/home/developer/.local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:\$PATH"
 EOF
 
+RUN apt-get update && \
+  apt-get install -y \
+  pkg-config \
+  libssl-dev && \
+  rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y curl && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
 ENV PATH="/usr/local/cargo/bin:/home/developer/.cargo/bin:/usr/local/bin:/home/developer/.local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:$PATH"
 ENV ANDROID_HOME=/opt/android-sdk
 ENV ANDROID_NDK_HOME=/opt/android-sdk/ndk/25.2.9519653
@@ -160,6 +171,11 @@ ENV RUSTUP_HOME=/home/developer/.rustup
 RUN chown developer:developer /home/developer/.profile
 
 USER developer
+RUN mkdir -p /home/developer/.local/share/.dx/tailwind && \
+    curl -L https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1.5/tailwindcss-linux-x64 \
+    -o /home/developer/.local/share/.dx/tailwind/tailwindcss-v4.1.5 && \
+    chmod +x ~/.local/share/.dx/tailwind/tailwindcss-v4.1.5
+
 WORKDIR /home/developer/repo
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
