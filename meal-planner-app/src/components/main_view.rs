@@ -1,17 +1,19 @@
 use dioxus::prelude::*;
 
-use crate::components::{db_manager::DbManagerView, food_swapper::SwapFoodView, meal_planner::MealPlanView};
+use crate::components::{
+    db_manager::DbManagerView, food_swapper::SwapFoodView, meal_planner::MealPlanView,
+};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ViewKind {
-	MealPlan,
-	SwapFood,
-	DbManager,
+    MealPlan,
+    SwapFood,
+    DbManager,
 }
 
 #[component]
 pub fn MainView(selection: Signal<ViewKind>) -> Element {
-	rsx! {
+    rsx! {
         main { class: "flex-1 p-4", role: "main",
             match selection() {
                 ViewKind::MealPlan => rsx! {

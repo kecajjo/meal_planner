@@ -3,7 +3,10 @@ use dioxus::prelude::*;
 /// Define a components module that contains all shared components for our app.
 mod components;
 
-use components::{action_bar::ActionBar, main_view::{MainView, ViewKind}};
+use components::{
+    action_bar::ActionBar,
+    main_view::{MainView, ViewKind},
+};
 
 // The asset macro also minifies some assets like CSS and JS to make bundled smaller
 const MAIN_CSS: Asset = asset!("/assets/styling/side_bar.css");
