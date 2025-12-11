@@ -35,6 +35,7 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                 }
                 *open_swipe_start.write() = None;
             },
+            onclick: move |_| *sidebar_open.write() = true,
             span { class: "sidebar-handle__hint", "›" }
 
             // Debug button for non-release builds (mobile only)

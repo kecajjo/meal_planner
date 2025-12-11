@@ -41,4 +41,32 @@ test.describe('Sidebar on mobile', () => {
     await page.getByRole('button', { name: 'Close navigation' }).click();
     await expect(sidebar).not.toHaveClass(/action-bar--open/);
   });
+
+  test('can open and close via swipe', async ({ page }) => {
+    await page.goto(basePath);
+
+    const sidebar = page.locator('.action-bar');
+    const handle = page.locator('.sidebar-handle');
+
+    await expect(handle).toBeVisible();
+    await expect(sidebar).not.toHaveClass(/action-bar--open/);
+
+    // Swipe right to open (simulate drag from left edge)
+    await page.mouse.move(1, 100);
+    await page.mouse.down();
+    await page.mouse.move(120, 100, { steps: 10 });
+    await page.mouse.up();
+    await expect(sidebar).toHaveClass(/action-bar--open/);
+
+    // Swipe left to close (simulate drag on sidebar)
+    const sidebarBox = await sidebar.boundingBox();
+    if (sidebarBox) {
+      const { x, y, width, height } = sidebarBox;
+      await page.mouse.move(x + width - 10, y + height / 2);
+      await page.mouse.down();
+      await page.mouse.move(x - 80, y + height / 2, { steps: 10 });
+      await page.mouse.up();
+    }
+    await expect(sidebar).not.toHaveClass(/action-bar--open/);
+  });
 });
