@@ -6,7 +6,7 @@ mod components;
 use components::{action_bar::ActionBar, main_view::{MainView, ViewKind}};
 
 // The asset macro also minifies some assets like CSS and JS to make bundled smaller
-const MAIN_CSS: Asset = asset!("/assets/styling/main.css");
+const MAIN_CSS: Asset = asset!("/assets/styling/side_bar.css");
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 
 fn main() {

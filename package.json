@@ -1,0 +1,14 @@
+{
+  "name": "meal_planner",
+  "version": "1.0.0",
+  "description": "App for planning meals for a set macroelements",
+  "main": "index.js",
+  "scripts": {},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^25.0.0"
+  }
+}
