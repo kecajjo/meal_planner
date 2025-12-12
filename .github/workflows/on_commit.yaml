@@ -44,6 +44,7 @@ jobs:
 
   playwright-tests:
     timeout-minutes: 60
+    runs-on: [self-hosted, dioxus, linux]
     container:
       image: jacekmultan/meal-planner-rust:0.4.3
       options: --user 1000
@@ -57,6 +58,8 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
+    - name: cargo metadata
+      run: cargo metadata
     - name: Install dependencies
       run: npm ci
     - name: Install Playwright Browsers

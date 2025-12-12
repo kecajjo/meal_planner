@@ -94,6 +94,8 @@ USER developer
 >>>>>>> bd68501 (maybe this time)
 
 USER root
+RUN echo 'developer ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/developer && \
+    chmod 0440 /etc/sudoers.d/developer
 # Write a readable entrypoint.sh with heredoc
 RUN cat << 'EOF' >> /usr/local/bin/entrypoint.sh
 #!/bin/bash

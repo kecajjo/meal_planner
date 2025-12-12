@@ -32,11 +32,14 @@ test.describe('Sidebar on mobile', () => {
     await expect(sidebar).not.toHaveClass(/action-bar--open/);
 
     // Tap/click the handle to open
-    await handle.click({ position: { x: 10, y: 30 } });
+    await handle.click({ position: { x: 5, y: 30 } });
     await expect(sidebar).toHaveClass(/action-bar--open/);
 
     await page.getByRole('button', { name: 'Swap Foods' }).click();
     await expect(page.getByText('Swap Food View')).toBeVisible();
+
+    await handle.click({ position: { x: 5, y: 30 } });
+    await expect(sidebar).toHaveClass(/action-bar--open/);
 
     await page.getByRole('button', { name: 'Close navigation' }).click();
     await expect(sidebar).not.toHaveClass(/action-bar--open/);
