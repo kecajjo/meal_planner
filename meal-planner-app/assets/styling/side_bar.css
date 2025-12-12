@@ -61,7 +61,7 @@ body {
     display: none;
 }
 
-.sidebar-backdrop {
+.action-bar__overlay {
     display: none;
 }
 
@@ -141,12 +141,12 @@ body {
         cursor: pointer;
     }
 
-    .sidebar-backdrop {
+    .action-bar__overlay {
         display: block;
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.35);
-        backdrop-filter: blur(2px);
-        z-index: 20;
+        background: transparent;
+        z-index: 30;
+        touch-action: none;
     }
 }
