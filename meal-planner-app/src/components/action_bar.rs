@@ -2,12 +2,33 @@ use dioxus::prelude::*;
 
 use crate::components::main_view::ViewKind;
 
+#[derive(Clone, Copy)]
+struct SwipeSession {
+    start_x: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum SwipeDirection {
+    Opening,
+    Closing,
+}
+
+impl SwipeDirection {
+    fn delta(self, start: f32, current: f32) -> f32 {
+        match self {
+            SwipeDirection::Opening => current - start,
+            SwipeDirection::Closing => start - current,
+        }
+    }
+}
+
 const SWIPE_THRESHOLD: f32 = 60.0;
+const HAS_POINTER_CAPTURE: bool = cfg!(all(feature = "web", target_arch = "wasm32"));
 
 #[component]
 pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>) -> Element {
-    let mut open_swipe_start = use_signal(|| None::<f32>);
-    let mut close_swipe_start = use_signal(|| None::<f32>);
+    let open_swipe = use_signal(|| None::<SwipeSession>);
+    let close_swipe = use_signal(|| None::<SwipeSession>);
 
     let nav_class = if sidebar_open() {
         "action-bar action-bar--open"
@@ -15,38 +36,108 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
         "action-bar"
     };
 
+    let overlay_active =
+        !HAS_POINTER_CAPTURE && (open_swipe().is_some() || close_swipe().is_some());
+
     rsx! {
+        if overlay_active {
+            div {
+                class: "swipe-overlay",
+                style: "position: fixed; inset: 0; z-index: 24; touch-action: none; background: transparent;",
+                onpointermove: move |evt| {
+                    let mut handled = false;
+                    if process_swipe_move(
+                        SwipeDirection::Opening,
+                        open_swipe.clone(),
+                        &evt,
+                        sidebar_open.clone(),
+                        true,
+                    ) {
+                        handled = true;
+                    }
+                    if process_swipe_move(
+                        SwipeDirection::Closing,
+                        close_swipe.clone(),
+                        &evt,
+                        sidebar_open.clone(),
+                        false,
+                    ) {
+                        handled = true;
+                    }
+                    if handled {
+                        release_pointer(&evt);
+                    }
+                },
+                onpointerup: move |evt| {
+                    let mut handled = false;
+                    if finalize_swipe(
+                        SwipeDirection::Opening,
+                        open_swipe.clone(),
+                        &evt,
+                        sidebar_open.clone(),
+                        true,
+                    ) {
+                        handled = true;
+                    }
+                    if finalize_swipe(
+                        SwipeDirection::Closing,
+                        close_swipe.clone(),
+                        &evt,
+                        sidebar_open.clone(),
+                        false,
+                    ) {
+                        handled = true;
+                    }
+                    if handled {
+                        release_pointer(&evt);
+                    }
+                },
+                onpointercancel: move |evt| {
+                    let cancelled_open = cancel_swipe(open_swipe.clone());
+                    let cancelled_close = cancel_swipe(close_swipe.clone());
+                    if cancelled_open || cancelled_close {
+                        release_pointer(&evt);
+                    }
+                },
+            }
+        }
         div {
             class: "sidebar-handle",
             role: "button",
             aria_label: "Open navigation",
             onpointerdown: move |evt| {
-                *open_swipe_start.write() = Some(pointer_x(&evt));
+                begin_swipe(open_swipe.clone(), &evt);
+                capture_pointer(&evt);
             },
-            onpointerleave: move |_| {
-                *open_swipe_start.write() = None;
+            onpointermove: move |evt| {
+                if process_swipe_move(
+                    SwipeDirection::Opening,
+                    open_swipe.clone(),
+                    &evt,
+                    sidebar_open.clone(),
+                    true,
+                ) {
+                    release_pointer(&evt);
+                }
             },
             onpointerup: move |evt| {
-                if let Some(start) = open_swipe_start() {
-                    let delta = pointer_x(&evt) - start;
-                    if delta > SWIPE_THRESHOLD {
-                        *sidebar_open.write() = true;
-                    }
+                if finalize_swipe(
+                    SwipeDirection::Opening,
+                    open_swipe.clone(),
+                    &evt,
+                    sidebar_open.clone(),
+                    true,
+                ) {
+                    release_pointer(&evt);
                 }
-                *open_swipe_start.write() = None;
+            },
+            onpointercancel: move |evt| {
+                if cancel_swipe(open_swipe.clone()) {
+                    release_pointer(&evt);
+                }
             },
             onclick: move |_| *sidebar_open.write() = true,
             span { class: "sidebar-handle__hint", "›" }
-
-            // Debug button for non-release builds (mobile only)
-            {cfg!(debug_assertions).then(|| rsx! {
-                button {
-                    class: "sidebar-debug-btn",
-                    onclick: move |_| *sidebar_open.write() = true,
-                    style: "position: absolute; bottom: 1.5rem; left: 0.25rem; z-index: 100; background: #64748b; color: #fff; border: none; border-radius: 0.375rem; padding: 0.5rem 0.75rem; font-size: 1rem;",
-                    "Open Sidebar (Debug)"
-                }
-            })}
         }
         nav {
             class: nav_class,
@@ -54,19 +145,35 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                 if !sidebar_open() {
                     return;
                 }
-                *close_swipe_start.write() = Some(pointer_x(&evt));
+                begin_swipe(close_swipe.clone(), &evt);
+                capture_pointer(&evt);
             },
-            onpointerleave: move |_| {
-                *close_swipe_start.write() = None;
+            onpointermove: move |evt| {
+                if process_swipe_move(
+                    SwipeDirection::Closing,
+                    close_swipe.clone(),
+                    &evt,
+                    sidebar_open.clone(),
+                    false,
+                ) {
+                    release_pointer(&evt);
+                }
             },
             onpointerup: move |evt| {
-                if let Some(start) = close_swipe_start() {
-                    let delta = start - pointer_x(&evt);
-                    if delta > SWIPE_THRESHOLD {
-                        *sidebar_open.write() = false;
-                    }
+                if finalize_swipe(
+                    SwipeDirection::Closing,
+                    close_swipe.clone(),
+                    &evt,
+                    sidebar_open.clone(),
+                    false,
+                ) {
+                    release_pointer(&evt);
                 }
-                *close_swipe_start.write() = None;
+            },
+            onpointercancel: move |evt| {
+                if cancel_swipe(close_swipe.clone()) {
+                    release_pointer(&evt);
+                }
             },
             button {
                 class: "action-bar__close",
@@ -104,4 +211,97 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
 
 fn pointer_x(evt: &PointerEvent) -> f32 {
     evt.client_coordinates().x as f32
+}
+
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
+fn capture_pointer(evt: &PointerEvent) {
+    use wasm_bindgen::JsCast;
+
+    if let Some(web_event) = evt.data().downcast::<web_sys::PointerEvent>() {
+        if let Some(target) = web_event
+            .target()
+            .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
+        {
+            let _ = target.set_pointer_capture(web_event.pointer_id());
+        }
+    }
+}
+
+#[cfg(not(all(feature = "web", target_arch = "wasm32")))]
+fn capture_pointer(_: &PointerEvent) {}
+
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
+fn release_pointer(evt: &PointerEvent) {
+    use wasm_bindgen::JsCast;
+
+    if let Some(web_event) = evt.data().downcast::<web_sys::PointerEvent>() {
+        if let Some(target) = web_event
+            .target()
+            .and_then(|t| t.dyn_into::<web_sys::Element>().ok())
+        {
+            let _ = target.release_pointer_capture(web_event.pointer_id());
+        }
+    }
+}
+
+#[cfg(not(all(feature = "web", target_arch = "wasm32")))]
+fn release_pointer(_: &PointerEvent) {}
+
+fn begin_swipe(swipe: Signal<Option<SwipeSession>>, evt: &PointerEvent) {
+    let mut swipe_state = swipe;
+    *swipe_state.write() = Some(SwipeSession {
+        start_x: pointer_x(evt),
+    });
+}
+
+fn process_swipe_move(
+    direction: SwipeDirection,
+    swipe: Signal<Option<SwipeSession>>,
+    evt: &PointerEvent,
+    sidebar_open: Signal<bool>,
+    target_state: bool,
+) -> bool {
+    if let Some(session) = swipe() {
+        let delta = direction.delta(session.start_x, pointer_x(evt));
+        if delta > SWIPE_THRESHOLD {
+            let mut sidebar_state = sidebar_open;
+            *sidebar_state.write() = target_state;
+            let mut swipe_state = swipe;
+            *swipe_state.write() = None;
+            return true;
+        }
+    }
+
+    false
+}
+
+fn finalize_swipe(
+    direction: SwipeDirection,
+    swipe: Signal<Option<SwipeSession>>,
+    evt: &PointerEvent,
+    sidebar_open: Signal<bool>,
+    target_state: bool,
+) -> bool {
+    if let Some(session) = swipe() {
+        let delta = direction.delta(session.start_x, pointer_x(evt));
+        if delta > SWIPE_THRESHOLD {
+            let mut sidebar_state = sidebar_open;
+            *sidebar_state.write() = target_state;
+        }
+        let mut swipe_state = swipe;
+        *swipe_state.write() = None;
+        return true;
+    }
+
+    false
+}
+
+fn cancel_swipe(swipe: Signal<Option<SwipeSession>>) -> bool {
+    if swipe().is_some() {
+        let mut swipe_state = swipe;
+        *swipe_state.write() = None;
+        return true;
+    }
+
+    false
 }

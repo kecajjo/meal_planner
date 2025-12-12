@@ -60,6 +60,8 @@ jobs:
         node-version: lts/*
     - name: cargo metadata
       run: cargo metadata
+    - name: build dioxus web app
+      run: dx build --platform web -p meal-planner-app
     - name: Install dependencies
       run: npm ci
     - name: Install Playwright Browsers

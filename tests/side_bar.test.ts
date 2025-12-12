@@ -55,9 +55,9 @@ test.describe('Sidebar on mobile', () => {
     await expect(sidebar).not.toHaveClass(/action-bar--open/);
 
     // Swipe right to open (simulate drag from left edge)
-    await page.mouse.move(1, 100);
+    await handle.hover({ position: { x: 6, y: 30 } });
     await page.mouse.down();
-    await page.mouse.move(120, 100, { steps: 10 });
+    await page.mouse.move(180, 100, { steps: 12 });
     await page.mouse.up();
     await expect(sidebar).toHaveClass(/action-bar--open/);
 
@@ -65,9 +65,9 @@ test.describe('Sidebar on mobile', () => {
     const sidebarBox = await sidebar.boundingBox();
     if (sidebarBox) {
       const { x, y, width, height } = sidebarBox;
-      await page.mouse.move(x + width - 10, y + height / 2);
+      await sidebar.hover({ position: { x: width - 10, y: height / 2 } });
       await page.mouse.down();
-      await page.mouse.move(x - 80, y + height / 2, { steps: 10 });
+      await page.mouse.move(x - 120, y + height / 2, { steps: 12 });
       await page.mouse.up();
     }
     await expect(sidebar).not.toHaveClass(/action-bar--open/);
