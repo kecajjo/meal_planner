@@ -22,3 +22,9 @@ web = ["dioxus/web"]
 desktop = ["dioxus/desktop"]
 # The feature that are only required for the mobile = ["dioxus/mobile"] build target should be optional and only enabled in the mobile = ["dioxus/mobile"] feature
 mobile = ["dioxus/mobile"]
+
+[lints.clippy]
+pedantic = { level = "deny", priority = 1 }
+missing_errors_doc = { level = "allow", priority = 2 }
+assigning_clones = { level = "allow", priority = 2 }
+cast_possible_wrap = { level = "allow", priority = 2 }

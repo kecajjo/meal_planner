@@ -25,7 +25,7 @@ fn main() {
 #[component]
 fn App() -> Element {
     let selection = use_signal(|| ViewKind::MealPlan);
-    let mut sidebar_open = use_signal(|| false);
+    let sidebar_open = use_signal(|| false);
 
     // The `rsx!` macro lets us define HTML inside of rust. It expands to an Element with all of our HTML inside.
     rsx! {
@@ -35,14 +35,6 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
 
         div { class: "app-shell text-slate-900",
-            // Mobile backdrop
-            if sidebar_open() {
-                div {
-                    class: "sidebar-backdrop",
-                    onclick: move |_| *sidebar_open.write() = false,
-                }
-            }
-
             ActionBar { selection, sidebar_open }
             MainView { selection }
         }

@@ -26,12 +26,23 @@ impl SwipeDirection {
         }
     }
 }
-
-const SWIPE_THRESHOLD: f32 = 60.0;
 #[cfg(not(target_os = "android"))]
-const CLICK_TIME_DELTA_MS: u128 = 600;
+mod non_android_constants {
+    pub(super) const SWIPE_THRESHOLD: f32 = 60.0;
+    pub(super) const CLICK_TIME_DELTA_MS: u128 = 600;
+}
 #[cfg(target_os = "android")]
-const CLICK_TIME_DELTA_MS: u128 = 1000;
+mod android_constants {
+    pub(super) const SWIPE_THRESHOLD: f32 = 15.0;
+    pub(super) const CLICK_TIME_DELTA_MS: u128 = 1000;
+}
+
+#[allow(clippy::wildcard_imports)]
+#[cfg(target_os = "android")]
+use android_constants::*;
+#[allow(clippy::wildcard_imports)]
+#[cfg(not(target_os = "android"))]
+use non_android_constants::*;
 
 #[component]
 pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>) -> Element {
@@ -50,25 +61,15 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
     };
 
     rsx! {
-        // for small screen - sigests there is a side bar which is closed
+        // for small screen - suggests there is a side bar which is closed
         div {
             class: "sidebar-handle",
             role: "button",
             aria_label: "Open navigation",
             onclick: move |_| *sidebar_open.write() = true,
             onpointerdown: move |evt| {
-                #[cfg(not(target_arch = "wasm32"))]
-                {
-                    let now = std::time::Instant::now();
-                    let mut mut_ptr_down_time = pointer_down_time;
-                    *mut_ptr_down_time.write() = Some(now);
-                }
-                #[cfg(target_arch = "wasm32")]
-                {
-                    let mut mut_ptr_down_time = pointer_down_time;
-                    *mut_ptr_down_time.write() = Some(js_sys::Date::new_0());
-                }
-                begin_swipe(open_swipe.clone(), &evt);
+                record_pointer_down(pointer_down_time);
+                begin_swipe(open_swipe, &evt);
             },
             span { class: "sidebar-handle__hint", ">>" }
         }
@@ -77,38 +78,16 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
             div {
                 class: "action-bar__overlay",
                 onpointerup: move |evt| {
-                    if was_click(pointer_down_time.clone()) {
+                    if was_click(pointer_down_time) {
                         cancel_swipe(open_swipe);
                         sidebar_open.set(true);
                     }
-                    calc_swipe(
-                        SwipeDirection::Opening,
-                        open_swipe.clone(),
-                        &evt,
-                        sidebar_open.clone(),
-                        true,
-                    );
-                    cancel_swipe(open_swipe.clone());
-                },
-                onpointerleave: move |evt| {
-                    calc_swipe(
-                        SwipeDirection::Opening,
-                        open_swipe.clone(),
-                        &evt,
-                        sidebar_open.clone(),
-                        true,
-                    );
-                    cancel_swipe(open_swipe.clone());
+                    calc_swipe(SwipeDirection::Opening, open_swipe, &evt, sidebar_open, true);
+                    cancel_swipe(open_swipe);
                 },
                 // if pointer was down already check if delata is over threshold
                 onpointermove: move |evt| {
-                    calc_swipe(
-                        SwipeDirection::Opening,
-                        open_swipe.clone(),
-                        &evt,
-                        sidebar_open.clone(),
-                        true,
-                    );
+                    calc_swipe(SwipeDirection::Opening, open_swipe, &evt, sidebar_open, true);
                 },
             }
         }
@@ -119,37 +98,14 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                 if !sidebar_open() {
                     return;
                 }
-                begin_swipe(close_swipe.clone(), &evt);
+                begin_swipe(close_swipe, &evt);
             },
             onpointerup: move |evt| {
-                calc_swipe(
-                    SwipeDirection::Closing,
-                    close_swipe.clone(),
-                    &evt,
-                    sidebar_open.clone(),
-                    false,
-                );
-                cancel_swipe(close_swipe.clone());
+                calc_swipe(SwipeDirection::Closing, close_swipe, &evt, sidebar_open, false);
+                cancel_swipe(close_swipe);
             },
-            onpointerleave: move |evt| {
-                calc_swipe(
-                    SwipeDirection::Closing,
-                    close_swipe.clone(),
-                    &evt,
-                    sidebar_open.clone(),
-                    false,
-                );
-                cancel_swipe(close_swipe.clone());
-            },
-            // if pointer was down already check if delata is over threshold
             onpointermove: move |evt| {
-                calc_swipe(
-                    SwipeDirection::Closing,
-                    close_swipe.clone(),
-                    &evt,
-                    sidebar_open.clone(),
-                    false,
-                );
+                calc_swipe(SwipeDirection::Closing, close_swipe, &evt, sidebar_open, false);
             },
             // visible only on small screens when side bar is open
             button {
@@ -187,6 +143,7 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
     }
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn pointer_x(evt: &PointerEvent) -> f32 {
     evt.client_coordinates().x as f32
 }
@@ -203,8 +160,6 @@ fn was_click(mut ptr_down_time: Signal<Option<time::Instant>>) -> bool {
         // events dont have timestamp if they are not in web, so get time of handling this event
         let elapsed = down_time.elapsed().as_millis();
         ptr_down_time.set(None);
-        #[cfg(target_os = "android")]
-        tracing::debug!("Time delta: {elapsed:?}");
         if elapsed < CLICK_TIME_DELTA_MS {
             return true;
         }
@@ -236,8 +191,6 @@ fn calc_swipe(
 ) {
     if let Some(session) = swipe() {
         let delta = direction.delta(session.start_x, pointer_x(evt));
-        #[cfg(target_os = "android")]
-        tracing::debug!("Swipe delta: {delta:?}");
         if delta > SWIPE_THRESHOLD {
             sidebar_open.set(target_state);
             swipe.set(None);
@@ -247,4 +200,14 @@ fn calc_swipe(
 
 fn cancel_swipe(mut swipe: Signal<Option<SwipeSession>>) {
     swipe.set(None);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn record_pointer_down(mut ptr_down_time: Signal<Option<time::Instant>>) {
+    *ptr_down_time.write() = Some(time::Instant::now());
+}
+
+#[cfg(target_arch = "wasm32")]
+fn record_pointer_down(mut ptr_down_time: Signal<Option<js_sys::Date>>) {
+    *ptr_down_time.write() = Some(js_sys::Date::new_0());
 }

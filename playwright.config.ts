@@ -73,8 +73,8 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'cd meal-planner-app && dx serve --platform web --port 8080',
-    url: 'http://localhost:8080',
+    command: 'dx serve --platform web --port 8080 -p meal-planner-app',
+    port: 8080,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
   },
