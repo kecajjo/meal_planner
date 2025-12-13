@@ -2788,6 +2788,9 @@ name = "meal-planner-app"
 version = "0.1.0"
 dependencies = [
  "dioxus",
+ "tracing",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
