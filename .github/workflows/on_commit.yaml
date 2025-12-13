@@ -16,7 +16,7 @@ jobs:
     name: Build and test
     runs-on: [self-hosted, dioxus, linux]
     container:
-      image: jacekmultan/meal-planner-rust:0.4.3
+      image: jacekmultan/meal-planner-rust:0.4.5
       options: --user 1000
     env:
       HOME: /home/developer
