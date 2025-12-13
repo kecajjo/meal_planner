@@ -18,7 +18,7 @@ web-sys = { version = "0.3" }
 default = ["desktop"]
 # The feature that is only required for the web build target should be optional and only enabled in the web feature
 web = ["dioxus/web"]
-# The feature that are only required for the desktop = ["dioxus/desktop"] build target should be optional and only enabled in the desktop = ["dioxus/desktop"] feature
+# The desktop feature is only required for desktop builds and should be enabled only in that context.
 desktop = ["dioxus/desktop"]
 # The feature that are only required for the mobile = ["dioxus/mobile"] build target should be optional and only enabled in the mobile = ["dioxus/mobile"] feature
 mobile = ["dioxus/mobile"]
