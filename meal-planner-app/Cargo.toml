@@ -20,7 +20,7 @@ default = ["desktop"]
 web = ["dioxus/web"]
 # The desktop feature is only required for desktop builds and should be enabled only in that context.
 desktop = ["dioxus/desktop"]
-# The feature that are only required for the mobile = ["dioxus/mobile"] build target should be optional and only enabled in the mobile = ["dioxus/mobile"] feature
+# The feature that is only required for the mobile build target should be optional and only enabled in the mobile feature
 mobile = ["dioxus/mobile"]
 
 [lints.clippy]
