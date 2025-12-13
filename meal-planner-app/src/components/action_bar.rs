@@ -79,7 +79,6 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                 class: "action-bar__overlay",
                 onpointerup: move |evt| {
                     if was_click(pointer_down_time) {
-                        cancel_swipe(open_swipe);
                         sidebar_open.set(true);
                     }
                     calc_swipe(SwipeDirection::Opening, open_swipe, &evt, sidebar_open, true);
