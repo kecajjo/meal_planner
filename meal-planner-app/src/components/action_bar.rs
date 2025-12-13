@@ -85,7 +85,7 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                     calc_swipe(SwipeDirection::Opening, open_swipe, &evt, sidebar_open, true);
                     cancel_swipe(open_swipe);
                 },
-                // if pointer was down already check if delata is over threshold
+                // if pointer was down already check if delta is over threshold
                 onpointermove: move |evt| {
                     calc_swipe(SwipeDirection::Opening, open_swipe, &evt, sidebar_open, true);
                 },
