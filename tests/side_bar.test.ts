@@ -76,7 +76,7 @@ test.describe('Sidebar on mobile', () => {
     const sidebarBox = await sidebar.boundingBox();
     if (sidebarBox) {
       const { x, y, width, height } = sidebarBox;
-      // click anywhere to unselect all the text it celected in this test
+      // click anywhere to unselect all the text it selected in this test
       await page.mouse.click(x + width + 10, y + height / 2);
       await sidebar.hover({ position: { x: width - 10, y: height / 2 } });
       await page.mouse.down();
