@@ -1,5 +1,10 @@
 use dioxus::prelude::*;
 
+#[cfg(not(target_arch = "wasm32"))]
+use std::time;
+#[cfg(target_arch = "wasm32")]
+use web_sys::js_sys;
+
 use crate::components::main_view::ViewKind;
 
 #[derive(Clone, Copy)]
@@ -22,12 +27,18 @@ impl SwipeDirection {
     }
 }
 
-const SWIPE_THRESHOLD: f32 = 60.0;
+const SWIPE_THRESHOLD: f32 = 30.0;
+const CLICK_TIME_DELTA_MS: u128 = 200;
 
 #[component]
 pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>) -> Element {
     let open_swipe = use_signal(|| None::<SwipeSession>);
     let close_swipe = use_signal(|| None::<SwipeSession>);
+    // Only track pointer_down_time on non-wasm targets
+    #[cfg(not(target_arch = "wasm32"))]
+    let pointer_down_time = use_signal(|| None::<time::Instant>);
+    #[cfg(target_arch = "wasm32")]
+    let pointer_down_time = use_signal(|| None::<js_sys::Date>);
 
     let nav_class = if sidebar_open() {
         "action-bar action-bar--open"
@@ -43,9 +54,24 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
             aria_label: "Open navigation",
             onclick: move |_| *sidebar_open.write() = true,
             onpointerdown: move |evt| {
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    let now = std::time::Instant::now();
+                    let mut mut_ptr_down_time = pointer_down_time;
+                    *mut_ptr_down_time.write() = Some(now);
+                }
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let mut mut_ptr_down_time = pointer_down_time;
+                    *mut_ptr_down_time.write() = Some(js_sys::Date::new_0());
+                }
                 begin_swipe(open_swipe.clone(), &evt);
             },
             onpointerup: move |evt| {
+                if was_click(pointer_down_time.clone()) {
+                    cancel_swipe(open_swipe);
+                    sidebar_open.set(true);
+                }
                 finalize_swipe(
                     SwipeDirection::Opening,
                     open_swipe.clone(),
@@ -64,6 +90,10 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
             div {
                 class: "action-bar__overlay",
                 onpointerup: move |evt| {
+                    if was_click(pointer_down_time.clone()) {
+                        cancel_swipe(open_swipe);
+                        sidebar_open.set(true);
+                    }
                     finalize_swipe(
                         SwipeDirection::Opening,
                         open_swipe.clone(),
@@ -160,6 +190,33 @@ fn begin_swipe(mut swipe: Signal<Option<SwipeSession>>, evt: &PointerEvent) {
     *swipe.write() = Some(SwipeSession {
         start_x: pointer_x(evt),
     });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn was_click(mut ptr_down_time: Signal<Option<time::Instant>>) -> bool {
+    if let Some(down_time) = ptr_down_time() {
+        // events dont have timestamp if they are not in web, so get time of handling this event
+        let elapsed = down_time.elapsed().as_millis();
+        *ptr_down_time.write() = None;
+        if elapsed < CLICK_TIME_DELTA_MS {
+            return true;
+        }
+    }
+
+    false
+}
+#[cfg(target_arch = "wasm32")]
+fn was_click(mut ptr_down_time: Signal<Option<js_sys::Date>>) -> bool {
+    if let Some(down_time) = ptr_down_time() {
+        let now = js_sys::Date::new_0();
+        let elapsed = now.get_time() - down_time.get_time();
+        *ptr_down_time.write() = None;
+        if elapsed < CLICK_TIME_DELTA_MS as f64 {
+            return true;
+        }
+    }
+
+    false
 }
 
 fn finalize_swipe(
