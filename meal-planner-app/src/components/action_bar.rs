@@ -27,8 +27,11 @@ impl SwipeDirection {
     }
 }
 
-const SWIPE_THRESHOLD: f32 = 30.0;
-const CLICK_TIME_DELTA_MS: u128 = 200;
+const SWIPE_THRESHOLD: f32 = 60.0;
+#[cfg(not(target_os = "android"))]
+const CLICK_TIME_DELTA_MS: u128 = 600;
+#[cfg(target_os = "android")]
+const CLICK_TIME_DELTA_MS: u128 = 1000;
 
 #[component]
 pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>) -> Element {
@@ -67,22 +70,6 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                 }
                 begin_swipe(open_swipe.clone(), &evt);
             },
-            onpointerup: move |evt| {
-                if was_click(pointer_down_time.clone()) {
-                    cancel_swipe(open_swipe);
-                    sidebar_open.set(true);
-                }
-                finalize_swipe(
-                    SwipeDirection::Opening,
-                    open_swipe.clone(),
-                    &evt,
-                    sidebar_open.clone(),
-                    true,
-                );
-            },
-            onpointercancel: move |_| {
-                cancel_swipe(open_swipe.clone());
-            },
             span { class: "sidebar-handle__hint", ">>" }
         }
         // after user starts to open side bar, overlay is needed to keep tracking of pointer events
@@ -94,25 +81,34 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                         cancel_swipe(open_swipe);
                         sidebar_open.set(true);
                     }
-                    finalize_swipe(
+                    calc_swipe(
                         SwipeDirection::Opening,
                         open_swipe.clone(),
                         &evt,
                         sidebar_open.clone(),
                         true,
                     );
+                    cancel_swipe(open_swipe.clone());
                 },
                 onpointerleave: move |evt| {
-                    finalize_swipe(
+                    calc_swipe(
                         SwipeDirection::Opening,
                         open_swipe.clone(),
                         &evt,
                         sidebar_open.clone(),
                         true,
                     );
-                },
-                onpointercancel: move |_| {
                     cancel_swipe(open_swipe.clone());
+                },
+                // if pointer was down already check if delata is over threshold
+                onpointermove: move |evt| {
+                    calc_swipe(
+                        SwipeDirection::Opening,
+                        open_swipe.clone(),
+                        &evt,
+                        sidebar_open.clone(),
+                        true,
+                    );
                 },
             }
         }
@@ -126,55 +122,64 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                 begin_swipe(close_swipe.clone(), &evt);
             },
             onpointerup: move |evt| {
-                finalize_swipe(
+                calc_swipe(
                     SwipeDirection::Closing,
                     close_swipe.clone(),
                     &evt,
                     sidebar_open.clone(),
                     false,
                 );
+                cancel_swipe(close_swipe.clone());
             },
             onpointerleave: move |evt| {
-                finalize_swipe(
+                calc_swipe(
                     SwipeDirection::Closing,
                     close_swipe.clone(),
                     &evt,
                     sidebar_open.clone(),
                     false,
                 );
-            },
-            onpointercancel: move |_| {
                 cancel_swipe(close_swipe.clone());
+            },
+            // if pointer was down already check if delata is over threshold
+            onpointermove: move |evt| {
+                calc_swipe(
+                    SwipeDirection::Closing,
+                    close_swipe.clone(),
+                    &evt,
+                    sidebar_open.clone(),
+                    false,
+                );
             },
             // visible only on small screens when side bar is open
             button {
                 class: "action-bar__close",
                 aria_label: "Close navigation",
-                onclick: move |_| *sidebar_open.write() = false,
+                onclick: move |_| sidebar_open.set(false),
                 "x"
             }
             // real side bar content
             button {
                 class: "action-bar__button",
                 onclick: move |_| {
-                    *selection.write() = ViewKind::MealPlan;
-                    *sidebar_open.write() = false;
+                    selection.set(ViewKind::MealPlan);
+                    sidebar_open.set(false);
                 },
                 "Meal Plan"
             }
             button {
                 class: "action-bar__button",
                 onclick: move |_| {
-                    *selection.write() = ViewKind::SwapFood;
-                    *sidebar_open.write() = false;
+                    selection.set(ViewKind::SwapFood);
+                    sidebar_open.set(false);
                 },
                 "Swap Foods"
             }
             button {
                 class: "action-bar__button",
                 onclick: move |_| {
-                    *selection.write() = ViewKind::DbManager;
-                    *sidebar_open.write() = false;
+                    selection.set(ViewKind::DbManager);
+                    sidebar_open.set(false);
                 },
                 "DB Manager"
             }
@@ -197,7 +202,9 @@ fn was_click(mut ptr_down_time: Signal<Option<time::Instant>>) -> bool {
     if let Some(down_time) = ptr_down_time() {
         // events dont have timestamp if they are not in web, so get time of handling this event
         let elapsed = down_time.elapsed().as_millis();
-        *ptr_down_time.write() = None;
+        ptr_down_time.set(None);
+        #[cfg(target_os = "android")]
+        tracing::debug!("Time delta: {elapsed:?}");
         if elapsed < CLICK_TIME_DELTA_MS {
             return true;
         }
@@ -205,12 +212,13 @@ fn was_click(mut ptr_down_time: Signal<Option<time::Instant>>) -> bool {
 
     false
 }
+
 #[cfg(target_arch = "wasm32")]
 fn was_click(mut ptr_down_time: Signal<Option<js_sys::Date>>) -> bool {
     if let Some(down_time) = ptr_down_time() {
         let now = js_sys::Date::new_0();
         let elapsed = now.get_time() - down_time.get_time();
-        *ptr_down_time.write() = None;
+        ptr_down_time.set(None);
         if elapsed < CLICK_TIME_DELTA_MS as f64 {
             return true;
         }
@@ -219,31 +227,24 @@ fn was_click(mut ptr_down_time: Signal<Option<js_sys::Date>>) -> bool {
     false
 }
 
-fn finalize_swipe(
+fn calc_swipe(
     direction: SwipeDirection,
     mut swipe: Signal<Option<SwipeSession>>,
     evt: &PointerEvent,
     mut sidebar_open: Signal<bool>,
     target_state: bool,
-) -> bool {
+) {
     if let Some(session) = swipe() {
         let delta = direction.delta(session.start_x, pointer_x(evt));
+        #[cfg(target_os = "android")]
+        tracing::debug!("Swipe delta: {delta:?}");
         if delta > SWIPE_THRESHOLD {
-            *sidebar_open.write() = target_state;
+            sidebar_open.set(target_state);
+            swipe.set(None);
         }
-        *swipe.write() = None;
-        return true;
     }
-
-    false
 }
 
-fn cancel_swipe(swipe: Signal<Option<SwipeSession>>) -> bool {
-    if swipe().is_some() {
-        let mut swipe_state = swipe;
-        *swipe_state.write() = None;
-        return true;
-    }
-
-    false
+fn cancel_swipe(mut swipe: Signal<Option<SwipeSession>>) {
+    swipe.set(None);
 }
