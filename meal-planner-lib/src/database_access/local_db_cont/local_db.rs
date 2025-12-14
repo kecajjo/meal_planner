@@ -1,7 +1,7 @@
 use core::fmt;
 use core::fmt::Write;
 use std::collections::{HashMap, HashSet};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -49,6 +49,7 @@ mod platform {
             .ok_or_else(|| "OPFS VFS handle not available after initialization".to_string())
     }
 
+    // TODO: this function is unused, what was its purpose?
     pub(super) fn wasm_persistent_storage_handle() -> Option<&'static OpfsSAHPoolUtil> {
         OPFS_VFS_HANDLE.get()
     }
@@ -213,7 +214,6 @@ impl Drop for SqliteConnection {
             unsafe {
                 let _ = ffi::sqlite3_close(self.raw);
             }
-            self.raw = ptr::null_mut();
         }
     }
 }
@@ -575,7 +575,7 @@ fn map_query_row_to_product(row: &Row) -> Result<(String, Product), String> {
         macro_values.push(row.get_f32(offset)?);
         offset += 1;
     }
-    if macro_values.len() != 5 {
+    if macro_values.len() != (MacroElementsType::COUNT - 1) as usize {
         return Err("Unexpected number of macro nutrient columns".to_string());
     }
     let macro_elems = MacroElements::new(
