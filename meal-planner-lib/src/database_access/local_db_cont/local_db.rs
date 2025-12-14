@@ -575,7 +575,7 @@ fn map_query_row_to_product(row: &Row) -> Result<(String, Product), String> {
         macro_values.push(row.get_f32(offset)?);
         offset += 1;
     }
-    if macro_values.len() != (MacroElementsType::COUNT - 1) as usize {
+    if macro_values.len() != (MacroElementsType::COUNT - 1) {
         return Err("Unexpected number of macro nutrient columns".to_string());
     }
     let macro_elems = MacroElements::new(
