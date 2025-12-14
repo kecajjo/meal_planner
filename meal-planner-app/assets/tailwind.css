@@ -161,6 +161,12 @@
   .visible {
     visibility: visible;
   }
+<<<<<<< HEAD
+=======
+  .static {
+    position: static;
+  }
+>>>>>>> 22b83d6 (in progress)
   .flex-1 {
     flex: 1;
   }

@@ -2752,6 +2752,9 @@ name = "meal-planner-app"
 version = "0.1.0"
 dependencies = [
  "dioxus",
+ "meal-planner-lib",
+ "strum",
+ "strum_macros",
  "tracing",
  "wasm-bindgen",
  "web-sys",
@@ -2767,8 +2770,6 @@ dependencies = [
  "libsqlite3-sys",
  "log",
  "microlp",
- "once_cell",
- "sqlite-wasm-rs",
  "strum",
  "strum_macros",
 ]

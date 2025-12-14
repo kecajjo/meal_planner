@@ -25,9 +25,6 @@ sqlite-wasm-rs = { version = "0.4.8", default-features = false, features = [
 default = []
 test-utils = []
 
-# [target.'cfg(not(all(target_arch = "wasm32", target_os = "emscripten")))'.dependencies]
-# rusqlite = "0.37.0"
-
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }
 missing_errors_doc = { level = "allow", priority = 2 }
