@@ -1,6 +1,3 @@
-use std::fs::OpenOptions;
-use std::io::Write;
-
 use dioxus::prelude::*;
 
 /// Define a components module that contains all shared components for our app.
@@ -20,7 +17,7 @@ const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 fn main() {
     // The `launch` function is the main entry point for a dioxus app. It takes a component and renders it with the platform feature
     // you have enabled
-    dioxus::launch(App);
+    dioxus::launch(app);
 }
 
 /// App is the main component of our app. Components are the building blocks of dioxus apps. Each component is a function
@@ -28,7 +25,7 @@ fn main() {
 ///
 /// Components should be annotated with `#[component]` to support props, better error messages, and autocomplete
 #[component]
-fn App() -> Element {
+fn app() -> Element {
     let selection = use_signal(|| ViewKind::MealPlan);
     let sidebar_open = use_signal(|| false);
 

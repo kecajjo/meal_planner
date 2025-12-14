@@ -2770,6 +2770,8 @@ dependencies = [
  "libsqlite3-sys",
  "log",
  "microlp",
+ "once_cell",
+ "sqlite-wasm-rs",
  "strum",
  "strum_macros",
 ]
