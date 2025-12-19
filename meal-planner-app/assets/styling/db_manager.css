@@ -1,1 +1,43 @@
 /* Styles for DbManagerView component */
+
+.db-add-btn {
+    margin-top: 2rem;
+    font-size: 1.1rem;
+    padding: 0.6rem 2.2rem;
+    border-radius: 0.4rem;
+    border: 1px solid #cbd5e1;
+    background: #6366f1;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.db-add-btn:hover,
+.db-add-btn:focus {
+    background: #4f46e5;
+    outline: none;
+}
+
+.db-popup {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #111827;
+    color: #fff;
+    padding: 0.9rem 1.4rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+    border: 1px solid #1f2937;
+    cursor: pointer;
+    z-index: 1000;
+    min-width: 240px;
+    text-align: center;
+}
+
+.db-popup:hover,
+.db-popup:focus {
+    background: #0b1220;
+    outline: none;
+}

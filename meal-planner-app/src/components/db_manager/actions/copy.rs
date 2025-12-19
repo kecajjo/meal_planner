@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 #[component]
-pub fn copy() -> Element {
+pub fn Copy() -> Element {
     rsx!(
         div { "Copy Component" }
     )

@@ -73,7 +73,6 @@ pub fn Product(product_signal: Signal<Option<data::Product>>, editable: bool) ->
     let mut allowed_units_open = use_signal(|| true);
 
     use_effect(move || {
-        tracing::debug!("Updating name and brand signal state");
         let Some(product) = product_signal() else {
             name_signal.set("".to_string());
             brand_signal.set("".to_string());
@@ -95,7 +94,6 @@ pub fn Product(product_signal: Signal<Option<data::Product>>, editable: bool) ->
     });
 
     use_effect(move || {
-        tracing::debug!("Updating Product component state");
         let new_product = Some(data::Product::new(
             name_signal(),
             if brand_signal().is_empty() {
@@ -160,7 +158,9 @@ pub fn Product(product_signal: Signal<Option<data::Product>>, editable: bool) ->
                 button {
                     class: "collapsible__header",
                     onclick: move |_| allowed_units_open.set(!allowed_units_open()),
-                    span { class: "collapsible__chevron", {if allowed_units_open() { "▾" } else { "▸" }} }
+                    span { class: "collapsible__chevron",
+                        {if allowed_units_open() { "▾" } else { "▸" }}
+                    }
                     span { class: "collapsible__title", {t("label-allowed-units")} }
                 }
                 if allowed_units_open() {

@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 #[component]
-pub fn modify() -> Element {
+pub fn Modify() -> Element {
     rsx!(
         div { "Modify Component" }
     )

@@ -34,3 +34,4 @@ action-db-manager = Menedzer bazy
 action-language = Jezyk
 lang-english = Angielski
 lang-polish = Polski
+action-add = Dodaj

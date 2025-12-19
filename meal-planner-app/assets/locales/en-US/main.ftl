@@ -34,3 +34,4 @@ action-db-manager = DB Manager
 action-language = Language
 lang-english = English
 lang-polish = Polish
+action-add = Add

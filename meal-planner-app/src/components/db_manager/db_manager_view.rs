@@ -60,13 +60,13 @@ pub fn DbManagerView() -> Element {
             div {
                 match curr_action {
                     DbActionKinds::Add => rsx! {
-                        add::add {}
+                        add::Add {}
                     },
                     DbActionKinds::Modify => rsx! {
-                        modify::modify {}
+                        modify::Modify {}
                     },
                     DbActionKinds::Copy => rsx! {
-                        copy::copy {}
+                        copy::Copy {}
                     },
                 }
             }
