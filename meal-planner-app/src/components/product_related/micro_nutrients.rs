@@ -45,7 +45,7 @@ fn MicroNutrientInput(
                             onwheel: move |e| {
                                 e.prevent_default();
                                 e.stop_propagation();
-                                let step = 0.01_f32;
+                                let step = 0.1_f32;
                                 let delta_y = match e.delta() {
                                     WheelDelta::Pixels(v) => v.y,
                                     WheelDelta::Lines(v) => v.y,

@@ -68,6 +68,9 @@ pub fn Product(product_signal: Signal<Option<data::Product>>, editable: bool) ->
         use_signal(|| data::MacroElements::new(0.0, 0.0, 0.0, 0.0, 0.0));
     let mut micro_nutrients_signal = use_signal(|| data::MicroNutrients::default());
     let mut allowed_units_signal = use_signal(|| data::AllowedUnits::default());
+    let mut macro_open = use_signal(|| true);
+    let mut micro_open = use_signal(|| true);
+    let mut allowed_units_open = use_signal(|| true);
 
     use_effect(move || {
         tracing::debug!("Updating name and brand signal state");
@@ -127,9 +130,45 @@ pub fn Product(product_signal: Signal<Option<data::Product>>, editable: bool) ->
                 input_ref: brand_input_ref,
                 editable,
             }
-            MacroElements { me_signal: macro_elements_signal, editable }
-            MicroNutrients { mn_signal: micro_nutrients_signal, editable }
-            AllowedUnits { ad_signal: allowed_units_signal, editable }
+            div { class: "collapsible",
+                button {
+                    class: "collapsible__header",
+                    onclick: move |_| macro_open.set(!macro_open()),
+                    span { class: "collapsible__chevron", {if macro_open() { "▾" } else { "▸" }} }
+                    span { class: "collapsible__title", {t("label-macro-elements")} }
+                }
+                if macro_open() {
+                    div { class: "collapsible__content",
+                        MacroElements { me_signal: macro_elements_signal, editable }
+                    }
+                }
+            }
+            div { class: "collapsible",
+                button {
+                    class: "collapsible__header",
+                    onclick: move |_| micro_open.set(!micro_open()),
+                    span { class: "collapsible__chevron", {if micro_open() { "▾" } else { "▸" }} }
+                    span { class: "collapsible__title", {t("label-micro-nutrients")} }
+                }
+                if micro_open() {
+                    div { class: "collapsible__content",
+                        MicroNutrients { mn_signal: micro_nutrients_signal, editable }
+                    }
+                }
+            }
+            div { class: "collapsible",
+                button {
+                    class: "collapsible__header",
+                    onclick: move |_| allowed_units_open.set(!allowed_units_open()),
+                    span { class: "collapsible__chevron", {if allowed_units_open() { "▾" } else { "▸" }} }
+                    span { class: "collapsible__title", {t("label-allowed-units")} }
+                }
+                if allowed_units_open() {
+                    div { class: "collapsible__content",
+                        AllowedUnits { ad_signal: allowed_units_signal, editable }
+                    }
+                }
+            }
         }
     }
 }

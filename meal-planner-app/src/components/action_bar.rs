@@ -48,6 +48,7 @@ use non_android_constants::*;
 #[component]
 pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>) -> Element {
     let mut locale = use_signal(|| "en-US".to_string());
+    let mut locale_rev = use_context::<Signal<u64>>();
     let open_swipe = use_signal(|| None::<SwipeSession>);
     let close_swipe = use_signal(|| None::<SwipeSession>);
     // Only track pointer_down_time on non-wasm targets
@@ -154,6 +155,7 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                         let val = e.value();
                         locale.set(val.clone());
                         set_locale(&val);
+                        locale_rev.set(locale_rev() + 1);
                     },
                     for (code , label_key) in LANG_OPTIONS {
                         option { value: code, selected: locale() == code, {t(label_key)} }

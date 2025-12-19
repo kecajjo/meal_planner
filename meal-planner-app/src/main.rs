@@ -30,6 +30,9 @@ fn main() {
 fn App() -> Element {
     let selection = use_signal(|| ViewKind::MealPlan);
     let sidebar_open = use_signal(|| false);
+    let locale_rev = use_signal(|| 0_u64);
+
+    use_context_provider(|| locale_rev);
 
     // The `rsx!` macro lets us define HTML inside of rust. It expands to an Element with all of our HTML inside.
     rsx! {

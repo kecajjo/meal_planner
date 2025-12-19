@@ -13,8 +13,10 @@ pub enum ViewKind {
 
 #[component]
 pub fn MainView(selection: Signal<ViewKind>) -> Element {
+    let locale_rev = use_context::<Signal<u64>>();
+    let _locale_rev = locale_rev();
     rsx! {
-        main { class: "flex-1 p-4", role: "main",
+        main { class: "flex-1 p-4 overflow-y-auto min-h-0", role: "main",
             match selection() {
                 ViewKind::MealPlan => rsx! {
                     MealPlanView {}
