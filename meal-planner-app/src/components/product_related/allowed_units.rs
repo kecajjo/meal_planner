@@ -100,7 +100,6 @@ pub fn AllowedUnits(ad_signal: Signal<DataAllowedUnits>, editable: bool) -> Elem
 
     rsx! {
         div { class: "allowed-section",
-            h3 { class: "allowed-title", {t("label-allowed-units")} }
             for (row_index , (unit , data)) in rows.iter().copied().enumerate() {
                 div { class: "allowed-row",
                     span { class: "allowed-label", {t("au-unit")} }

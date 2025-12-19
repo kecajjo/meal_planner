@@ -120,7 +120,6 @@ pub fn MacroElements(me_signal: Signal<DataMacroElements>, editable: bool) -> El
 
     rsx! {
         div {
-            {format!("{}:", t("label-macro-elements"))}
             MacroElementSingleInputField {
                 label_key: "label-fat",
                 macro_type: DataMEType::Fat,

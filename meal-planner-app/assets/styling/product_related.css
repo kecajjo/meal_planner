@@ -22,10 +22,6 @@
     min-width: 7rem;
 }
 
-.micro-value {
-    color: #0f172a;
-}
-
 .micro-controls {
     display: flex;
     align-items: center;
@@ -40,8 +36,8 @@
     border: 1px solid #cbd5e1;
     border-right: 0;
     border-radius: 0.35rem 0 0 0.35rem;
-    background: #f8fafc;
-    color: #0f172a;
+    background: transparent;
+    color: inherit;
     font-size: 0.95rem;
 }
 
@@ -50,8 +46,8 @@
     padding: 0.35rem 0.5rem;
     border: 1px solid #cbd5e1;
     border-radius: 0.35rem;
-    background: #fff;
-    color: #0f172a;
+    background: transparent;
+    color: inherit;
 }
 
 .nutrient-input:focus {
@@ -62,8 +58,8 @@
 
 .nutrient-input--disabled,
 .nutrient-input:disabled {
-    background: #e2e8f0;
-    color: #475569;
+    background: transparent;
+    color: inherit;
     cursor: not-allowed;
 }
 
@@ -99,8 +95,29 @@
     padding: 0.35rem 0.5rem;
     border: 1px solid #cbd5e1;
     border-radius: 0.35rem;
-    background: #fff;
+    background: transparent;
+    color: inherit;
+}
+
+.allowed-select option {
     color: #0f172a;
+    background: #fff;
+}
+
+.allowed-select option:focus,
+.allowed-select option:checked,
+.allowed-select option:hover {
+    background: #e5e7eb !important;
+    color: #0f172a !important;
+}
+
+/* Fallback for platforms that ignore option:hover */
+.allowed-select:hover {
+    background: #f8fafc;
+}
+
+.allowed-select option:disabled {
+    color: #94a3b8;
 }
 
 .allowed-select:focus,
@@ -115,8 +132,8 @@
     padding: 0.4rem 0.75rem;
     border: 1px solid #cbd5e1;
     border-radius: 0.35rem;
-    background: #f8fafc;
-    color: #0f172a;
+    background: transparent;
+    color: inherit;
     cursor: pointer;
 }
 
@@ -130,8 +147,7 @@
     border: 1px solid #e2e8f0;
     border-radius: 0.5rem;
     margin-top: 0.75rem;
-    background: #fff;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    background: transparent;
 }
 
 .collapsible__header {
@@ -144,7 +160,7 @@
     border: none;
     cursor: pointer;
     font-weight: 600;
-    color: #0f172a;
+    color: inherit;
     text-align: left;
 }
 

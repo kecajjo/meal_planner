@@ -132,7 +132,6 @@ pub fn MicroNutrients(mn_signal: Signal<DataMicroNutrients>, editable: bool) -> 
 
     rsx! {
         div { class: "micro-section",
-            h3 { class: "micro-title", {t("label-micro-nutrients")} }
             if editable || fiber_signal().is_some() {
                 MicroNutrientInput {
                     label_key: "mn-fiber",
