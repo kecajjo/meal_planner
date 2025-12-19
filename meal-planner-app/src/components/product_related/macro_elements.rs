@@ -1,4 +1,5 @@
 use crate::i18n::t;
+use dioxus::html::geometry::WheelDelta;
 use dioxus::prelude::*;
 use meal_planner_lib::data_types::{
     MacroElements as DataMacroElements, MacroElementsType as DataMEType,
@@ -19,12 +20,26 @@ fn MacroElementSingleInputField(
             {format!("{}: ", t(label_key))}
             if editable {
                 input {
+                    class: "nutrient-input",
                     r#type: "number",
                     step: "0.01",
                     value: signal().to_string(),
+                    onwheel: move |e| {
+                        e.prevent_default();
+                        e.stop_propagation();
+                        let step = 0.01_f32;
+                        let delta_y = match e.delta() {
+                            WheelDelta::Pixels(v) => v.y,
+                            WheelDelta::Lines(v) => v.y,
+                            WheelDelta::Pages(v) => v.y,
+                        };
+                        let delta = if delta_y < 0.0 { step } else { -step };
+                        let next = (signal() + delta).max(0.0);
+                        signal.set(next);
+                    },
                     onchange: move |e| {
                         if let Ok(val) = e.value().parse::<f32>() {
-                            signal.set(val);
+                            signal.set(val.max(0.0));
                         } else {
                             signal.set(signal());
                         }

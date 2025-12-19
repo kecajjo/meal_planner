@@ -12,6 +12,7 @@ use components::{
 // The asset macro also minifies some assets like CSS and JS to make bundled smaller
 const SIDE_BAR_CSS: Asset = asset!("/assets/styling/side_bar.css");
 const DB_MANAGER_CSS: Asset = asset!("/assets/styling/db_manager.css");
+const PRODUCT_RELATED_CSS: Asset = asset!("/assets/styling/product_related.css");
 const MAIN_CSS: Asset = asset!("/assets/styling/main.css");
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 
@@ -38,6 +39,7 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
         document::Link { rel: "stylesheet", href: SIDE_BAR_CSS }
         document::Link { rel: "stylesheet", href: DB_MANAGER_CSS }
+        document::Link { rel: "stylesheet", href: PRODUCT_RELATED_CSS }
 
         div { class: "app-shell text-slate-900",
             ActionBar { selection, sidebar_open }
