@@ -1,17 +1,22 @@
+use crate::i18n::t;
 use dioxus::prelude::*;
 use meal_planner_lib::data_types::{
     MacroElements as DataMacroElements, MacroElementsType as DataMEType,
 };
+use std::rc::Rc;
 
 #[component]
 fn MacroElementSingleInputField(
-    label: &'static str,
+    label_key: &'static str,
+    macro_type: DataMEType,
     signal: Signal<f32>,
+    macro_signal: Signal<DataMacroElements>,
+    input_ref: Signal<Option<MountedData>>,
     editable: bool,
 ) -> Element {
     rsx! {
         div {
-            {format!("{label}: ")}
+            {format!("{}: ", t(label_key))}
             if editable {
                 input {
                     r#type: "number",
@@ -24,6 +29,24 @@ fn MacroElementSingleInputField(
                             signal.set(signal());
                         }
                     },
+                    onmounted: move |e| {
+                        let Event { data, .. } = e;
+                        match Rc::try_unwrap(data) {
+                            Ok(mounted) => input_ref.set(Some(mounted)),
+                            Err(_) => panic!("Element not mounted properly in EditableTextInput"),
+                        }
+                    },
+                    onkeydown: move |e| {
+                        if e.key() == Key::Enter || e.key() == Key::Escape {
+                            if let Some(input) = input_ref.read().as_ref() {
+                                let _ = input.set_focus(false);
+                            }
+                        }
+                        if e.key() == Key::Escape {
+                            let macro_elements = macro_signal();
+                            signal.set(macro_elements[macro_type]);
+                        }
+                    },
                 }
             } else {
                 {signal().to_string()}
@@ -34,6 +57,12 @@ fn MacroElementSingleInputField(
 
 #[component]
 pub fn MacroElements(me_signal: Signal<DataMacroElements>, editable: bool) -> Element {
+    // Signals for input refs
+    let fat_input_ref = use_signal(|| None);
+    let saturated_fat_input_ref = use_signal(|| None);
+    let carbs_input_ref = use_signal(|| None);
+    let sugar_input_ref = use_signal(|| None);
+    let protein_input_ref = use_signal(|| None);
     // Signals for each editable field
     let mut fat_signal = use_signal(|| me_signal()[DataMEType::Fat]);
     let mut saturated_fat_signal = use_signal(|| me_signal()[DataMEType::SaturatedFat]);
@@ -76,18 +105,49 @@ pub fn MacroElements(me_signal: Signal<DataMacroElements>, editable: bool) -> El
 
     rsx! {
         div {
-            "Macro Elements:"
-            MacroElementSingleInputField { label: "Fat", signal: fat_signal, editable }
+            {format!("{}:", t("label-macro-elements"))}
             MacroElementSingleInputField {
-                label: "Saturated Fat",
-                signal: saturated_fat_signal,
+                label_key: "label-fat",
+                macro_type: DataMEType::Fat,
+                signal: fat_signal,
+                macro_signal: me_signal,
+                input_ref: fat_input_ref,
                 editable,
             }
-            MacroElementSingleInputField { label: "Carbohydrates", signal: carbs_signal, editable }
-            MacroElementSingleInputField { label: "Sugar", signal: sugar_signal, editable }
-            MacroElementSingleInputField { label: "Protein", signal: protein_signal, editable }
+            MacroElementSingleInputField {
+                label_key: "label-saturated-fat",
+                macro_type: DataMEType::SaturatedFat,
+                signal: saturated_fat_signal,
+                macro_signal: me_signal,
+                input_ref: saturated_fat_input_ref,
+                editable,
+            }
+            MacroElementSingleInputField {
+                label_key: "label-carbohydrates",
+                macro_type: DataMEType::Carbs,
+                signal: carbs_signal,
+                macro_signal: me_signal,
+                input_ref: carbs_input_ref,
+                editable,
+            }
+            MacroElementSingleInputField {
+                label_key: "label-sugar",
+                macro_type: DataMEType::Sugar,
+                signal: sugar_signal,
+                macro_signal: me_signal,
+                input_ref: sugar_input_ref,
+                editable,
+            }
+            MacroElementSingleInputField {
+                label_key: "label-protein",
+                macro_type: DataMEType::Protein,
+                signal: protein_signal,
+                macro_signal: me_signal,
+                input_ref: protein_input_ref,
+                editable,
+            }
             div {
-                "Calories: "
+                {format!("{}: ", t("label-calories"))}
                 {((calories * 100.0).round() / 100.0).to_string()}
             }
         }

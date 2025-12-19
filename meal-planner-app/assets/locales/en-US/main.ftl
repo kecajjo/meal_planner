@@ -1,0 +1,17 @@
+label-name = Name
+label-brand = Brand
+label-macro-elements = Macro Elements
+label-fat = Fat
+label-saturated-fat = Saturated Fat
+label-carbohydrates = Carbohydrates
+label-sugar = Sugar
+label-protein = Protein
+label-calories = Calories
+action-open-navigation = Open navigation
+action-close-navigation = Close navigation
+action-meal-plan = Meal Plan
+action-swap-foods = Swap Foods
+action-db-manager = DB Manager
+action-language = Language
+lang-english = English
+lang-polish = Polish

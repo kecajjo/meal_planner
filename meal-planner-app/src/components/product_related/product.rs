@@ -1,11 +1,19 @@
 use super::{AllowedUnits, MacroElements, MicroNutrients};
+use crate::i18n::t;
 use dioxus::prelude::*;
 use meal_planner_lib::data_types as data;
 use std::rc::Rc;
 
+#[derive(Clone, Copy, PartialEq)]
+enum ProductField {
+    Name,
+    Brand,
+}
+
 #[component]
 fn EditableTextInput(
-    label: &'static str,
+    label_key: &'static str,
+    field: ProductField,
     signal: Signal<String>,
     product_signal: Signal<Option<data::Product>>,
     input_ref: Signal<Option<MountedData>>,
@@ -13,7 +21,7 @@ fn EditableTextInput(
 ) -> Element {
     rsx! {
         div {
-            "{label}: "
+            {format!("{}: ", t(label_key))}
             if editable {
                 input {
                     value: signal(),
@@ -32,19 +40,14 @@ fn EditableTextInput(
                             }
                         }
                         if e.key() == Key::Escape {
-                            signal
-                                .set(
-                                    match product_signal() {
-                                        Some(prod) => {
-                                            match label {
-                                                "Name" => prod.name().to_string(),
-                                                "Brand" => prod.brand().unwrap_or("").to_string(),
-                                                _ => "".to_string(),
-                                            }
-                                        }
-                                        None => "".to_string(),
-                                    },
-                                );
+                            let reset_value = match (product_signal(), field) {
+                                (Some(prod), ProductField::Name) => prod.name().to_string(),
+                                (Some(prod), ProductField::Brand) => {
+                                    prod.brand().unwrap_or("").to_string()
+                                }
+                                _ => "".to_string(),
+                            };
+                            signal.set(reset_value);
                         }
                     },
                 }
@@ -109,14 +112,16 @@ pub fn Product(product_signal: Signal<Option<data::Product>>, editable: bool) ->
     rsx! {
         div {
             EditableTextInput {
-                label: "Name",
+                label_key: "label-name",
+                field: ProductField::Name,
                 signal: name_signal,
                 product_signal,
                 input_ref: name_input_ref,
                 editable,
             }
             EditableTextInput {
-                label: "Brand",
+                label_key: "label-brand",
+                field: ProductField::Brand,
                 signal: brand_signal,
                 product_signal,
                 input_ref: brand_input_ref,

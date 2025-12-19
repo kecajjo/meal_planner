@@ -1,0 +1,17 @@
+label-name = Nazwa
+label-brand = Marka
+label-macro-elements = Makroskladniki
+label-fat = Tluszcze
+label-saturated-fat = Tluszcze nasycone
+label-carbohydrates = Weglowodany
+label-sugar = Cukry
+label-protein = Bialko
+label-calories = Kalorie
+action-open-navigation = Otworz nawigacje
+action-close-navigation = Zamknij nawigacje
+action-meal-plan = Plan posilkow
+action-swap-foods = Zamien produkty
+action-db-manager = Menedzer bazy
+action-language = Jezyk
+lang-english = Angielski
+lang-polish = Polski

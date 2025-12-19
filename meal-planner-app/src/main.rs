@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 
 /// Define a components module that contains all shared components for our app.
 mod components;
+mod i18n;
 
 use components::{
     action_bar::ActionBar,

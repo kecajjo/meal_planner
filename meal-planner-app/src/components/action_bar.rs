@@ -1,3 +1,4 @@
+use crate::i18n::{set_locale, t};
 use dioxus::prelude::*;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -46,6 +47,7 @@ use non_android_constants::*;
 
 #[component]
 pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>) -> Element {
+    let mut locale = use_signal(|| "en-US".to_string());
     let open_swipe = use_signal(|| None::<SwipeSession>);
     let close_swipe = use_signal(|| None::<SwipeSession>);
     // Only track pointer_down_time on non-wasm targets
@@ -60,12 +62,18 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
         "action-bar"
     };
 
+    use_effect(move || {
+        set_locale(&locale());
+    });
+
+    const LANG_OPTIONS: [(&str, &str); 2] = [("en-US", "lang-english"), ("pl-PL", "lang-polish")];
+
     rsx! {
         // for small screen - suggests there is a side bar which is closed
         div {
             class: "sidebar-handle",
             role: "button",
-            aria_label: "Open navigation",
+            aria_label: t("action-open-navigation"),
             onclick: move |_| *sidebar_open.write() = true,
             onpointerdown: move |evt| {
                 record_pointer_down(pointer_down_time);
@@ -109,7 +117,7 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
             // visible only on small screens when side bar is open
             button {
                 class: "action-bar__close",
-                aria_label: "Close navigation",
+                aria_label: t("action-close-navigation"),
                 onclick: move |_| sidebar_open.set(false),
                 "x"
             }
@@ -120,7 +128,7 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                     selection.set(ViewKind::MealPlan);
                     sidebar_open.set(false);
                 },
-                "Meal Plan"
+                {t("action-meal-plan")}
             }
             button {
                 class: "action-bar__button",
@@ -128,7 +136,7 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                     selection.set(ViewKind::SwapFood);
                     sidebar_open.set(false);
                 },
-                "Swap Foods"
+                {t("action-swap-foods")}
             }
             button {
                 class: "action-bar__button",
@@ -136,7 +144,21 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                     selection.set(ViewKind::DbManager);
                     sidebar_open.set(false);
                 },
-                "DB Manager"
+                {t("action-db-manager")}
+            }
+            div { class: "action-bar__button",
+                select {
+                    id: "lang-select",
+                    value: locale(),
+                    onchange: move |e| {
+                        let val = e.value();
+                        locale.set(val.clone());
+                        set_locale(&val);
+                    },
+                    for (code , label_key) in LANG_OPTIONS {
+                        option { value: code, selected: locale() == code, {t(label_key)} }
+                    }
+                }
             }
         }
     }
