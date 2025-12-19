@@ -7,3 +7,4 @@ pub mod db_manager;
 pub mod food_swapper;
 pub mod main_view;
 pub mod meal_planner;
+pub mod product_related;
