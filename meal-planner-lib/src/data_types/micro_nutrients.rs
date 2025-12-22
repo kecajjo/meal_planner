@@ -1,4 +1,5 @@
 use core::fmt;
+use serde::{Deserialize, Serialize};
 use std::{
     hash::Hash,
     ops::{Add, Index, IndexMut},
@@ -6,7 +7,7 @@ use std::{
 use strum::IntoEnumIterator;
 use strum_macros::{EnumCount, EnumIter};
 
-#[derive(EnumIter, PartialEq, Eq, Hash, Copy, Clone, Debug, EnumCount)]
+#[derive(EnumIter, PartialEq, Eq, Hash, Copy, Clone, Debug, EnumCount, Serialize, Deserialize)]
 pub enum MicroNutrientsType {
     Fiber,
     Zinc,
@@ -27,7 +28,7 @@ impl fmt::Display for MicroNutrientsType {
 }
 
 // Micro nutrients per 100g
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MicroNutrients {
     elements: std::collections::HashMap<MicroNutrientsType, Option<f32>>,
 }

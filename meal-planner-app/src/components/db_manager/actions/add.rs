@@ -16,11 +16,12 @@ fn add_trigerred(
             return;
         }
     };
-    result_signal.set(Some(Err("Adding product...".to_string())));
-    // let mut db = db_access::get_mutable_db(db_access::DataBaseTypes::Local)
-    //     .expect("Couldnt access local Database");
-    // let product_id = product.id();
-    // result_signal.set(db.add_product(&product_id, product));
+    tracing::info!("Creating DB access");
+    let mut db = db_access::get_mutable_db(db_access::DataBaseTypes::Local("local_db.sqlite"))
+        .expect("Couldnt access local Database");
+    tracing::info!("DB Accessed");
+    let product_id = product.id();
+    result_signal.set(Some(db.add_product(&product_id, product)));
 }
 
 #[component]

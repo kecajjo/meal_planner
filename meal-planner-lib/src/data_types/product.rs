@@ -1,4 +1,5 @@
 use core::fmt;
+use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use strum_macros::{EnumCount, EnumIter};
 
@@ -13,7 +14,7 @@ pub enum NutrientType {
     Micro(MicroNutrientsType),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter, EnumCount)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter, EnumCount, Serialize, Deserialize)]
 pub enum AllowedUnitsType {
     Gram,
     Piece,
@@ -47,7 +48,7 @@ const DEFAULT_ALLOWED_UNITS: (AllowedUnitsType, UnitData) = (
     },
 );
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Hash, Serialize, Deserialize)]
 pub struct UnitData {
     pub amount: u16,
     pub divider: u16,
@@ -55,7 +56,7 @@ pub struct UnitData {
 
 pub type AllowedUnits = std::collections::HashMap<AllowedUnitsType, UnitData>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Product {
     name: String,
     brand: Option<String>,

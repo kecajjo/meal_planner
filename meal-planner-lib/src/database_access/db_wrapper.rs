@@ -1,4 +1,5 @@
 use core::panic;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::data_types::{Product, UnitData};
@@ -7,14 +8,15 @@ use super::local_db;
 #[cfg(any(test, feature = "test-utils"))]
 use super::mock_db;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DataBaseTypes {
     #[cfg(any(test, feature = "test-utils"))]
     Mock,
     OpenFoodFacts,
-    Local,
+    Local(String),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DbSearchCriteria {
     ById(String),
     // ByBarcode(String),
@@ -29,9 +31,7 @@ pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn Database>> {
     match db_type {
         #[cfg(any(test, feature = "test-utils"))]
         DataBaseTypes::Mock => Some(Box::new(mock_db::MockProductDb::new())),
-        DataBaseTypes::Local => Some(Box::new(local_db::LocalProductDb::new(
-            local_db::DATABASE_FILENAME,
-        )?)),
+        DataBaseTypes::Local(db_path) => Some(Box::new(local_db::LocalProductDb::new(&db_path)?)),
         _ => panic!("Database type not supported in this build."),
         // DataBaseTypes::OpenFoodFactsDb => {
         //     Box::new(open_food_facts_wrapper::OpenFoodFactsDbWrapper::new())
@@ -48,9 +48,7 @@ pub fn get_mutable_db(db_type: DataBaseTypes) -> Option<Box<dyn MutableDatabase>
     match db_type {
         #[cfg(any(test, feature = "test-utils"))]
         DataBaseTypes::Mock => Some(Box::new(mock_db::MockProductDb::new())),
-        DataBaseTypes::Local => Some(Box::new(local_db::LocalProductDb::new(
-            local_db::DATABASE_FILENAME,
-        )?)),
+        DataBaseTypes::Local(db_path) => Some(Box::new(local_db::LocalProductDb::new(&db_path)?)),
         _ => panic!("Database type not mutable."),
     }
 }
@@ -60,7 +58,7 @@ pub fn get_mutable_db_types() -> Vec<DataBaseTypes> {
     let types = vec![
         #[cfg(any(test, feature = "test-utils"))]
         DataBaseTypes::Mock,
-        DataBaseTypes::Local,
+        DataBaseTypes::Local("local_db.sqlite".to_string()),
     ];
     types
 }

@@ -1,5 +1,8 @@
 mod db_wrapper;
 
+#[cfg(feature = "__internal-wasm-worker-bin")]
+pub mod local_db_cont;
+#[cfg(not(feature = "__internal-wasm-worker-bin"))]
 mod local_db_cont;
 #[cfg(any(test, feature = "test-utils"))]
 mod mock_db;
