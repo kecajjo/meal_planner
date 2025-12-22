@@ -166,8 +166,9 @@ impl MockProductDb {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl MutableDatabase for MockProductDb {
-    fn add_product(
+    async fn add_product(
         &mut self,
         product_id: &str,
         product: crate::data_types::Product,
@@ -182,7 +183,7 @@ impl MutableDatabase for MockProductDb {
         Ok(())
     }
 
-    fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
+    async fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         if !self.products.contains_key(product_id) {
             return Err(format!("Product with ID '{product_id}' not found."));
         }
@@ -190,7 +191,7 @@ impl MutableDatabase for MockProductDb {
         Ok(())
     }
 
-    fn delete_product(&mut self, product_id: &str) -> Result<(), String> {
+    async fn delete_product(&mut self, product_id: &str) -> Result<(), String> {
         if self.products.remove(product_id).is_some() {
             Ok(())
         } else {
@@ -199,8 +200,9 @@ impl MutableDatabase for MockProductDb {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Database for MockProductDb {
-    fn get_products_matching_criteria(
+    async fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
     ) -> HashMap<String, crate::data_types::Product> {
@@ -224,7 +226,7 @@ impl Database for MockProductDb {
         results
     }
 
-    fn set_product_unit(
+    async fn set_product_unit(
         &mut self,
         product_id: &str,
         allowed_unit: crate::data_types::AllowedUnitsType,
@@ -247,6 +249,7 @@ mod tests {
     use crate::data_types::{MacroElements, Product};
     use crate::database_access::DbSearchCriteria;
     use approx::assert_relative_eq;
+    use futures::executor::block_on;
 
     #[test]
     fn test_new_and_sample_products() {
@@ -281,14 +284,11 @@ mod tests {
                 map
             },
         );
-        assert!(
-            db.add_product(product.id().as_str(), product.clone())
-                .is_ok()
-        );
+        assert!(block_on(db.add_product(product.id().as_str(), product.clone())).is_ok());
         let key = product.id();
         assert!(db.products.contains_key(&key));
         // Adding again should not duplicate
-        assert!(db.add_product(product.id().as_str(), product).is_err());
+        assert!(block_on(db.add_product(product.id().as_str(), product)).is_err());
         assert_eq!(db.products.len(), 7);
     }
 
@@ -300,10 +300,7 @@ mod tests {
         let mut product = db.products[key].clone();
         let new_macros = Box::new(MacroElements::new(9.0, 8.0, 7.0, 6.0, 5.0));
         product.macro_elements = new_macros.clone();
-        assert!(
-            db.update_product(product.id().as_str(), product.clone())
-                .is_ok()
-        );
+        assert!(block_on(db.update_product(product.id().as_str(), product.clone())).is_ok());
         let updated = &db.products[key].macro_elements;
         assert_relative_eq!(
             updated[MacroElementsType::Fat],
@@ -331,7 +328,7 @@ mod tests {
     fn test_get_products_matching_criteria_by_name() {
         let db = MockProductDb::new();
         let crit = vec![DbSearchCriteria::ById("App".to_string())];
-        let results = db.get_products_matching_criteria(&crit);
+        let results = block_on(db.get_products_matching_criteria(&crit));
         assert_eq!(results.len(), 1);
         assert!(results.contains_key("Apple (BrandedApple)"));
     }
@@ -345,7 +342,7 @@ mod tests {
             amount: 123,
             divider: 2,
         };
-        let result = db.set_product_unit(product_id, unit, unit_data);
+        let result = block_on(db.set_product_unit(product_id, unit, unit_data));
         assert!(result.is_ok());
         let product = db.products.get(product_id).unwrap();
         assert_eq!(product.allowed_units.get(&unit), Some(&unit_data));
@@ -360,7 +357,7 @@ mod tests {
             amount: 123,
             divider: 1,
         };
-        let result = db.set_product_unit(product_id, unit, unit_data);
+        let result = block_on(db.set_product_unit(product_id, unit, unit_data));
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),

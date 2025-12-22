@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::data_types::{Product, UnitData};
+use async_trait::async_trait;
 
 use super::local_db;
 #[cfg(any(test, feature = "test-utils"))]
@@ -27,11 +28,13 @@ pub enum DbSearchCriteria {
 /// # Panics
 /// Panics if the database type is not supported in this build.
 #[must_use]
-pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn Database>> {
+pub async fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn Database>> {
     match db_type {
         #[cfg(any(test, feature = "test-utils"))]
         DataBaseTypes::Mock => Some(Box::new(mock_db::MockProductDb::new())),
-        DataBaseTypes::Local(db_path) => Some(Box::new(local_db::LocalProductDb::new(&db_path)?)),
+        DataBaseTypes::Local(db_path) => {
+            Some(Box::new(local_db::LocalProductDb::new(&db_path).await?))
+        }
         _ => panic!("Database type not supported in this build."),
         // DataBaseTypes::OpenFoodFactsDb => {
         //     Box::new(open_food_facts_wrapper::OpenFoodFactsDbWrapper::new())
@@ -44,11 +47,13 @@ pub fn get_db(db_type: DataBaseTypes) -> Option<Box<dyn Database>> {
 /// # Panics
 /// Panics if the database type is not mutable.
 #[must_use]
-pub fn get_mutable_db(db_type: DataBaseTypes) -> Option<Box<dyn MutableDatabase>> {
+pub async fn get_mutable_db(db_type: DataBaseTypes) -> Option<Box<dyn MutableDatabase>> {
     match db_type {
         #[cfg(any(test, feature = "test-utils"))]
         DataBaseTypes::Mock => Some(Box::new(mock_db::MockProductDb::new())),
-        DataBaseTypes::Local(db_path) => Some(Box::new(local_db::LocalProductDb::new(&db_path)?)),
+        DataBaseTypes::Local(db_path) => {
+            Some(Box::new(local_db::LocalProductDb::new(&db_path).await?))
+        }
         _ => panic!("Database type not mutable."),
     }
 }
@@ -63,64 +68,71 @@ pub fn get_mutable_db_types() -> Vec<DataBaseTypes> {
     types
 }
 
+#[async_trait(?Send)]
 pub trait Database {
-    fn get_products_matching_criteria(
+    async fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
     ) -> HashMap<String, crate::data_types::Product>;
 
-    fn set_product_unit(
+    async fn set_product_unit(
         &mut self,
         product_id: &str,
         allowed_unit: crate::data_types::AllowedUnitsType,
         unit_data: UnitData,
     ) -> Result<(), String>;
 
-    fn update_product_units(
+    async fn update_product_units(
         &mut self,
         product_id: &str,
         allowed_units: &crate::data_types::AllowedUnits,
     ) -> Result<(), String> {
         for (unit, qty) in allowed_units {
-            self.set_product_unit(product_id, *unit, *qty)?;
+            self.set_product_unit(product_id, *unit, *qty).await?;
         }
         Ok(())
     }
 
-    fn clone_product_units(
+    async fn clone_product_units(
         &mut self,
         source_units: &crate::data_types::AllowedUnits,
         target_product_id: &str,
     ) -> Result<(), String> {
         let mut dest_prod = self
             .get_product_by_id(target_product_id)
+            .await
             .ok_or_else(|| format!("Product with ID '{target_product_id}' not found."))?;
         dest_prod.allowed_units = source_units.clone();
-        self.update_product_units(target_product_id, &dest_prod.allowed_units)?;
+        self.update_product_units(target_product_id, &dest_prod.allowed_units)
+            .await?;
         Ok(())
     }
 
-    fn get_product_by_id(&self, product_id: &str) -> Option<crate::data_types::Product> {
-        let mut results =
-            self.get_products_matching_criteria(&[DbSearchCriteria::ById(product_id.to_string())]);
+    async fn get_product_by_id(&self, product_id: &str) -> Option<crate::data_types::Product> {
+        let mut results = self
+            .get_products_matching_criteria(&[DbSearchCriteria::ById(product_id.to_string())])
+            .await;
         results.remove(product_id)
     }
 }
 
+#[async_trait(?Send)]
 pub trait MutableDatabase: Database {
-    fn add_product(
+    async fn add_product(
         &mut self,
         product_id: &str,
         product: crate::data_types::Product,
     ) -> Result<(), String>;
-    fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String>;
-    fn delete_product(&mut self, product_id: &str) -> Result<(), String>;
+    async fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String>;
+    async fn delete_product(&mut self, product_id: &str) -> Result<(), String>;
 }
 
 #[cfg(test)]
 mod dbwrapper_trait_default_impl_tests {
     use super::*;
     use crate::data_types::{AllowedUnitsType, MacroElements, Product};
+    use async_trait::async_trait;
+    use futures::executor::block_on;
     use std::collections::HashMap;
 
     struct DummyDb {
@@ -128,8 +140,9 @@ mod dbwrapper_trait_default_impl_tests {
         pub set_calls: std::cell::RefCell<Vec<(String, AllowedUnitsType, u16, u16)>>,
     }
 
+    #[async_trait(?Send)]
     impl Database for DummyDb {
-        fn get_products_matching_criteria(
+        async fn get_products_matching_criteria(
             &self,
             criteria: &[DbSearchCriteria],
         ) -> HashMap<String, Product> {
@@ -147,7 +160,7 @@ mod dbwrapper_trait_default_impl_tests {
             map
         }
 
-        fn set_product_unit(
+        async fn set_product_unit(
             &mut self,
             product_id: &str,
             allowed_unit: AllowedUnitsType,
@@ -196,7 +209,7 @@ mod dbwrapper_trait_default_impl_tests {
             products,
             set_calls: std::cell::RefCell::new(vec![]),
         };
-        let result = db.update_product_units(&prod.id(), &prod.allowed_units);
+        let result = block_on(db.update_product_units(&prod.id(), &prod.allowed_units));
         assert!(result.is_ok());
         let calls = db.set_calls.borrow();
         assert_eq!(calls.len(), 1);
@@ -223,7 +236,7 @@ mod dbwrapper_trait_default_impl_tests {
             products,
             set_calls: std::cell::RefCell::new(vec![]),
         };
-        let result = db.clone_product_units(&source.allowed_units, "Banana (BrandB)");
+        let result = block_on(db.clone_product_units(&source.allowed_units, "Banana (BrandB)"));
         assert!(result.is_ok());
         // Should have called set_product_unit for each allowed_unit in source
         let calls = db.set_calls.borrow();
@@ -253,7 +266,7 @@ mod dbwrapper_trait_default_impl_tests {
             products,
             set_calls: std::cell::RefCell::new(vec![]),
         };
-        let result = db.clone_product_units(&source.allowed_units, "NonExistent");
+        let result = block_on(db.clone_product_units(&source.allowed_units, "NonExistent"));
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
@@ -270,10 +283,10 @@ mod dbwrapper_trait_default_impl_tests {
             products,
             set_calls: std::cell::RefCell::new(vec![]),
         };
-        let found = db.get_product_by_id("Apple (BrandA)");
+        let found = block_on(db.get_product_by_id("Apple (BrandA)"));
         assert!(found.is_some());
         assert_eq!(found.unwrap().name(), "Apple");
-        let not_found = db.get_product_by_id("NonExistent");
+        let not_found = block_on(db.get_product_by_id("NonExistent"));
         assert!(not_found.is_none());
     }
 }

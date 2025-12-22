@@ -74,9 +74,7 @@ impl Product {
         micro_nutrients: Box<MicroNutrients>,
         mut allowed_units: AllowedUnits,
     ) -> Self {
-        if allowed_units.is_empty() {
-            allowed_units.insert(DEFAULT_ALLOWED_UNITS.0, DEFAULT_ALLOWED_UNITS.1);
-        }
+        allowed_units.insert(DEFAULT_ALLOWED_UNITS.0, DEFAULT_ALLOWED_UNITS.1);
         Self {
             name,
             brand,

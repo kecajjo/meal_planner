@@ -1,6 +1,5 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use futures::executor::block_on;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use strum::{EnumCount, IntoEnumIterator};
@@ -58,14 +57,16 @@ impl LocalProductDbConcrete {
             .map_err(|_| "Failed to access worker cell".to_string())?
     }
 
-    fn send_request(
+    async fn send_request(
         worker: &DbWorkerHandle,
         req: &serde_json::Value,
     ) -> Result<WorkerResponse, String> {
         let payload =
             serde_json::to_string(req).map_err(|e| format!("Failed to serialise request: {e}"))?;
 
-        let js_res = block_on(worker.send_raw(JsValue::from_str(&payload)))
+        let js_res = worker
+            .send_raw(JsValue::from_str(&payload))
+            .await
             .map_err(|e| format!("Worker request failed: {e:?}"))?;
 
         let text = js_res
@@ -75,14 +76,14 @@ impl LocalProductDbConcrete {
         serde_json::from_str(&text).map_err(|e| format!("Failed to parse worker response: {e}"))
     }
 
-    fn send_exec(&self, statements: Vec<SqlStatement>) -> Result<(), String> {
+    async fn send_exec(&self, statements: Vec<SqlStatement>) -> Result<(), String> {
         let req = json!({
             "type": "Exec",
             "database_file": self.key,
             "statements": statements,
         });
 
-        match Self::send_request(&self.worker, &req) {
+        match Self::send_request(&self.worker, &req).await {
             Ok(WorkerResponse::Ok) => Ok(()),
             Ok(WorkerResponse::Err { message }) => Err(message),
             Ok(WorkerResponse::Rows { .. }) => Err("Unexpected rows for Exec".to_string()),
@@ -90,7 +91,7 @@ impl LocalProductDbConcrete {
         }
     }
 
-    fn send_query(&self, sql: String, bind: Vec<Value>) -> Result<Vec<Map<String, Value>>, String> {
+    async fn send_query(&self, sql: String, bind: Vec<Value>) -> Result<Vec<Map<String, Value>>, String> {
         let req = json!({
             "type": "Query",
             "database_file": self.key,
@@ -98,7 +99,7 @@ impl LocalProductDbConcrete {
             "bind": bind,
         });
 
-        match Self::send_request(&self.worker, &req) {
+        match Self::send_request(&self.worker, &req).await {
             Ok(WorkerResponse::Rows { rows }) => Ok(rows),
             Ok(WorkerResponse::Ok) => Err("Query returned Ok without rows".to_string()),
             Ok(WorkerResponse::Err { message }) => Err(message),
@@ -191,7 +192,7 @@ impl LocalProductDbConcrete {
     }
 
     /// Create a new DB handle backed by the OPFS worker.
-    pub fn new(key: &str) -> Option<Self> {
+    pub async fn new(key: &str) -> Option<Self> {
         let worker = Self::get_or_create_worker().ok()?;
 
         let db = Self {
@@ -199,19 +200,19 @@ impl LocalProductDbConcrete {
             key: key.to_string(),
         };
 
-        if let Err(e) = db.init_db() {
+        if let Err(e) = db.init_db().await {
             tracing::error!("Failed to initialise wasm local DB: {e}");
             return None;
         }
         Some(db)
     }
 
-    fn init_db(&self) -> Result<(), String> {
+    async fn init_db(&self) -> Result<(), String> {
         let init_req = json!({
             "type": "InitDbFile",
             "database_file": self.key,
         });
-        match Self::send_request(&self.worker, &init_req) {
+        match Self::send_request(&self.worker, &init_req).await {
             Ok(WorkerResponse::Ok) => {
                 tracing::debug!("Worker init succeeded");
             }
@@ -226,17 +227,18 @@ impl LocalProductDbConcrete {
             }
         }
 
-        self.send_exec(schema_statements())
+        self.send_exec(schema_statements()).await
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Database for LocalProductDbConcrete {
-    fn get_products_matching_criteria(
+    async fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
     ) -> HashMap<String, Product> {
         let (sql, bind) = build_select_query(criteria);
-        match self.send_query(sql, bind) {
+        match self.send_query(sql, bind).await {
             Ok(rows) => rows
                 .into_iter()
                 .filter_map(|row| match Self::map_row_to_product(&row) {
@@ -254,7 +256,7 @@ impl Database for LocalProductDbConcrete {
         }
     }
 
-    fn set_product_unit(
+    async fn set_product_unit(
         &mut self,
         product_id: &str,
         allowed_unit: AllowedUnitsType,
@@ -271,17 +273,18 @@ impl Database for LocalProductDbConcrete {
                 product_id.into(),
             ]),
         };
-        self.send_exec(vec![stmt])
+        self.send_exec(vec![stmt]).await
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl MutableDatabase for LocalProductDbConcrete {
-    fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
+    async fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         let stmts = build_insert_statements(product_id, &product);
-        self.send_exec(stmts)
+        self.send_exec(stmts).await
     }
 
-    fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
+    async fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         let mut stmts = Vec::new();
         stmts.push(SqlStatement {
             sql: "UPDATE products SET name = ?, brand = ? WHERE id = ?;".to_string(),
@@ -341,15 +344,15 @@ impl MutableDatabase for LocalProductDbConcrete {
             });
         }
 
-        self.send_exec(stmts)
+        self.send_exec(stmts).await
     }
 
-    fn delete_product(&mut self, product_id: &str) -> Result<(), String> {
+    async fn delete_product(&mut self, product_id: &str) -> Result<(), String> {
         let stmt = SqlStatement {
             sql: "DELETE FROM products WHERE id = ?;".to_string(),
             bind: Some(vec![product_id.into()]),
         };
-        self.send_exec(vec![stmt])
+        self.send_exec(vec![stmt]).await
     }
 }
 

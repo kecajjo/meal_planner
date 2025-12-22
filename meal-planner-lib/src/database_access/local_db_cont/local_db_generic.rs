@@ -307,7 +307,8 @@ impl fmt::Display for SqlTablesNames {
 // TODO panicking to be replaced with proper error handling
 impl LocalProductDbConcrete {
     /// Creates a SQLite-backed product database.
-    pub fn new(database_file: &str) -> Option<Self> {
+    #[allow(clippy::unused_async)]
+    pub async fn new(database_file: &str) -> Option<Self> {
         let con = SqliteConnection::open(database_file).ok()?;
         if con.enable_foreign_keys().is_err() {
             return None;
@@ -541,8 +542,9 @@ fn map_query_row_to_product(row: &Row) -> Result<(String, Product), String> {
     Ok((id, product))
 }
 
+#[async_trait::async_trait(?Send)]
 impl Database for LocalProductDbConcrete {
-    fn get_products_matching_criteria(
+    async fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
     ) -> HashMap<String, Product> {
@@ -605,7 +607,7 @@ impl Database for LocalProductDbConcrete {
         result_map
     }
 
-    fn set_product_unit(
+    async fn set_product_unit(
         &mut self,
         product_id: &str,
         allowed_unit: AllowedUnitsType,
@@ -633,8 +635,9 @@ impl Database for LocalProductDbConcrete {
 
 // function is long because there are 2 macro definitions inside
 #[allow(clippy::too_many_lines)]
+#[async_trait::async_trait(?Send)]
 impl MutableDatabase for LocalProductDbConcrete {
-    fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
+    async fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         let run_query = |table_name: &str,
                          columns_str: &str,
                          values_str: &str|
@@ -750,7 +753,7 @@ impl MutableDatabase for LocalProductDbConcrete {
         Ok(())
     }
 
-    fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
+    async fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         let run_query = |table: &str, col: &str, val: &str| {
             self.sqlite_con
                 .execute(&format!(
@@ -823,7 +826,7 @@ impl MutableDatabase for LocalProductDbConcrete {
         Ok(())
     }
 
-    fn delete_product(&mut self, product_id: &str) -> Result<(), String> {
+    async fn delete_product(&mut self, product_id: &str) -> Result<(), String> {
         let main_table_name = SqlTablesNames::Products.to_string();
         self.sqlite_con
             .execute(
@@ -850,6 +853,7 @@ mod tests {
     };
     use crate::database_access::{Database, DbSearchCriteria, MutableDatabase};
     use approx::assert_relative_eq;
+    use futures::executor::block_on;
     use std::collections::HashMap;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -905,7 +909,7 @@ mod tests {
             .expect("Database path contains invalid UTF-8");
 
         {
-            let _db = LocalProductDbConcrete::new(path_str)
+            let _db = block_on(LocalProductDbConcrete::new(path_str))
                 .expect("Expected LocalProductDbConcrete::new to succeed for fresh database");
         }
 
@@ -964,13 +968,14 @@ mod tests {
             );
 
             let product_id = product.id();
-            db.add_product(product_id.as_str(), product)
+            block_on(db.add_product(product_id.as_str(), product))
                 .expect("Expected add_product to succeed for persisted product");
         }
 
         let db = test_db.local_db();
-        let results =
-            db.get_products_matching_criteria(&[DbSearchCriteria::ById("Persisted".to_string())]);
+        let results = block_on(
+            db.get_products_matching_criteria(&[DbSearchCriteria::ById("Persisted".to_string())]),
+        );
         let key = "Persisted (BrandP)";
         assert!(
             results.contains_key(key),
@@ -994,7 +999,7 @@ mod tests {
             let path_str = path
                 .to_str()
                 .ok_or_else(|| "Database path contains invalid UTF-8".to_string())?;
-            let db = LocalProductDbConcrete::new(path_str)
+            let db = block_on(LocalProductDbConcrete::new(path_str))
                 .ok_or_else(|| "LocalProductDbConcrete::new returned None".to_string())?;
             drop(db);
             Ok(Self {
@@ -1022,11 +1027,11 @@ mod tests {
         }
 
         fn local_db(&self) -> LocalProductDbConcrete {
-            LocalProductDbConcrete::new(
+            block_on(LocalProductDbConcrete::new(
                 self.path
                     .to_str()
                     .expect("Database path contains invalid UTF-8"),
-            )
+            ))
             .expect("Failed to reopen seeded LocalProductDbConcrete")
         }
     }
@@ -1156,7 +1161,7 @@ mod tests {
             apple_allowed,
         );
         let apple_id = apple.id();
-        db.add_product(apple_id.as_str(), apple)
+        block_on(db.add_product(apple_id.as_str(), apple))
             .map_err(|e| format!("Failed to seed product {apple_id}: {e}"))?;
 
         let mut banana_allowed: AllowedUnits = HashMap::new();
@@ -1194,7 +1199,7 @@ mod tests {
             banana_allowed,
         );
         let banana_id = banana.id();
-        db.add_product(banana_id.as_str(), banana)
+        block_on(db.add_product(banana_id.as_str(), banana))
             .map_err(|e| format!("Failed to seed product {banana_id}: {e}"))?;
 
         Ok(())
@@ -1239,8 +1244,9 @@ mod tests {
     fn test_03_get_products_matching_criteria_returns_expected_product() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let db = test_db.local_db();
-        let results =
-            db.get_products_matching_criteria(&[DbSearchCriteria::ById("Apple".to_string())]);
+        let results = block_on(
+            db.get_products_matching_criteria(&[DbSearchCriteria::ById("Apple".to_string())]),
+        );
         assert_eq!(results.len(), 1);
         let apple = results
             .get("Apple (BrandA)")
@@ -1260,14 +1266,14 @@ mod tests {
     fn test_04_set_product_unit_updates_allowed_units_table() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
-        let result = db.set_product_unit(
+        let result = block_on(db.set_product_unit(
             "Apple (BrandA)",
             AllowedUnitsType::Cup,
             UnitData {
                 amount: 3,
                 divider: 2,
             },
-        );
+        ));
         assert!(result.is_ok());
         let conn = test_db.connection();
         let updated = conn
@@ -1318,7 +1324,7 @@ mod tests {
         );
         let new_id = new_product.id();
         assert!(
-            db.add_product(new_id.as_str(), new_product).is_ok(),
+            block_on(db.add_product(new_id.as_str(), new_product)).is_ok(),
             "Expected add_product to succeed"
         );
         let conn = test_db.connection();
@@ -1364,7 +1370,7 @@ mod tests {
             allowed_units,
         );
         assert!(
-            db.update_product("Apple (BrandA)", updated).is_ok(),
+            block_on(db.update_product("Apple (BrandA)", updated)).is_ok(),
             "Expected update_product to succeed"
         );
         let conn = test_db.connection();
@@ -1383,7 +1389,7 @@ mod tests {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         assert!(
-            db.delete_product("Banana").is_ok(),
+            block_on(db.delete_product("Banana")).is_ok(),
             "Expected delete_product to succeed"
         );
         let conn = test_db.connection();
@@ -1409,7 +1415,7 @@ mod tests {
         let path_str = db_path
             .to_str()
             .expect("Database path contains invalid UTF-8");
-        let result = LocalProductDbConcrete::new(path_str);
+        let result = block_on(LocalProductDbConcrete::new(path_str));
         assert!(
             result.is_some(),
             "Expected LocalProductDbConcrete::new to return Some"

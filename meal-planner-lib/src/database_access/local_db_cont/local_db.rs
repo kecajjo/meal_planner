@@ -20,20 +20,23 @@ pub struct LocalProductDb {
 #[allow(warnings)]
 impl LocalProductDb {
     /// Creates a new local database instance backed by `SQLite`.
-    pub fn new(database_file: &str) -> Option<Self> {
-        LocalProductDbConcrete::new(database_file).map(|inner| Self { inner })
+    pub async fn new(database_file: &str) -> Option<Self> {
+        LocalProductDbConcrete::new(database_file)
+            .await
+            .map(|inner| Self { inner })
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Database for LocalProductDb {
-    fn get_products_matching_criteria(
+    async fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
     ) -> HashMap<String, Product> {
-        self.inner.get_products_matching_criteria(criteria)
+        self.inner.get_products_matching_criteria(criteria).await
     }
 
-    fn set_product_unit(
+    async fn set_product_unit(
         &mut self,
         product_id: &str,
         allowed_unit: AllowedUnitsType,
@@ -41,19 +44,21 @@ impl Database for LocalProductDb {
     ) -> Result<(), String> {
         self.inner
             .set_product_unit(product_id, allowed_unit, unit_data)
+            .await
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl MutableDatabase for LocalProductDb {
-    fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
-        self.inner.add_product(product_id, product)
+    async fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
+        self.inner.add_product(product_id, product).await
     }
 
-    fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
-        self.inner.update_product(product_id, product)
+    async fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
+        self.inner.update_product(product_id, product).await
     }
 
-    fn delete_product(&mut self, product_id: &str) -> Result<(), String> {
-        self.inner.delete_product(product_id)
+    async fn delete_product(&mut self, product_id: &str) -> Result<(), String> {
+        self.inner.delete_product(product_id).await
     }
 }
