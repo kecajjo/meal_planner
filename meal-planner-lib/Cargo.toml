@@ -7,12 +7,6 @@ edition = "2024"
 # Enable building to wasm with wasm-bindgen while still keeping the normal rlib.
 crate-type = ["cdylib", "rlib"]
 
-[[bin]]
-name = "wasm_worker_main"
-path = "src/database_access/local_db_cont/wasm_worker_main.rs"
-required-features = ["__internal-wasm-worker-bin"]
-
-
 [dependencies]
 approx = "0.5.1"
 const_format = "0.2.35"
@@ -31,6 +25,7 @@ js-sys = "0.3.72"
 web-sys = { version = "0.3.72", features = [
     "Blob",
     "DedicatedWorkerGlobalScope",
+    "ErrorEvent",
     "MessageEvent",
     "Url",
     "Worker",
@@ -38,6 +33,8 @@ web-sys = { version = "0.3.72", features = [
     "WorkerType",
     "console",
 ] }
+console_error_panic_hook = "0.1"
+console_log = "1"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.45"
@@ -53,7 +50,6 @@ sqlite-wasm-rs = { version = "0.4.8", default-features = false, features = [
 [features]
 default = []
 test-utils = []
-__internal-wasm-worker-bin = []
 
 [lints.clippy]
 pedantic = { level = "deny", priority = 1 }

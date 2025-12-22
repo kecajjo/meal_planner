@@ -16,66 +16,8 @@ use crate::data_types::{
 };
 use crate::database_access::{Database, DbSearchCriteria, MutableDatabase};
 
-#[cfg(target_arch = "wasm32")]
-mod platform {
-    use futures::executor::block_on;
-    use sqlite_wasm_rs::sahpool_vfs::{self, OpfsSAHPoolCfg, OpfsSAHPoolUtil};
-    use std::sync::OnceLock;
+use libsqlite3_sys as ffi;
 
-    pub(super) use sqlite_wasm_rs as ffi;
-
-    static OPFS_VFS_HANDLE: OnceLock<OpfsSAHPoolUtil> = OnceLock::new();
-
-    async fn init_wasm_persistent_storage_with_config(
-        config: OpfsSAHPoolCfg,
-    ) -> Result<&'static OpfsSAHPoolUtil, String> {
-        tracing::debug!("init_wasm_persistent_storage_with_config1");
-        if let Some(handle) = OPFS_VFS_HANDLE.get() {
-            return Ok(handle);
-        }
-        tracing::debug!("init_wasm_persistent_storage_with_config2");
-        let util = sahpool_vfs::install(&config, true)
-            .await
-            .map_err(|err| err.to_string())?;
-
-        tracing::debug!("init_wasm_persistent_storage_with_config3");
-        if OPFS_VFS_HANDLE.set(util).is_err() {
-            // Another initializer won the race; drop the unused handle.
-        }
-
-        tracing::debug!("init_wasm_persistent_storage_with_config4");
-        OPFS_VFS_HANDLE
-            .get()
-            .ok_or_else(|| "OPFS VFS handle not available after initialization".to_string())
-    }
-
-    // TODO: this function is unused, what was its purpose?
-    pub(super) fn wasm_persistent_storage_handle() -> Option<&'static OpfsSAHPoolUtil> {
-        OPFS_VFS_HANDLE.get()
-    }
-
-    async fn init_wasm_persistent_storage() -> Result<&'static OpfsSAHPoolUtil, String> {
-        tracing::debug!("init_wasm_persistent_storage");
-        init_wasm_persistent_storage_with_config(OpfsSAHPoolCfg::default()).await
-    }
-
-    pub(super) fn ensure_wasm_persistent_storage_ready() -> Result<(), String> {
-        if OPFS_VFS_HANDLE.get().is_some() {
-            return Ok(());
-        }
-        tracing::debug!("ensure_wasm_persistent_storage_ready");
-        block_on(async { init_wasm_persistent_storage().await.map(|_| ()) })
-    }
-}
-#[cfg(target_arch = "wasm32")]
-use platform::{ensure_wasm_persistent_storage_ready, ffi};
-
-#[cfg(not(target_arch = "wasm32"))]
-mod platform {
-    pub(super) use libsqlite3_sys as ffi;
-}
-#[cfg(not(target_arch = "wasm32"))]
-use platform::ffi;
 #[cfg(test)]
 pub(crate) const DATABASE_FILENAME: &str = "src/database_access/local_db_cont/test_local_db.sqlite";
 
@@ -338,7 +280,7 @@ impl Row<'_> {
     }
 }
 
-pub struct LocalProductDb {
+pub struct LocalProductDbConcrete {
     sqlite_con: SqliteConnection,
 }
 
@@ -363,30 +305,15 @@ impl fmt::Display for SqlTablesNames {
 }
 
 // TODO panicking to be replaced with proper error handling
-impl LocalProductDb {
+impl LocalProductDbConcrete {
     /// Creates a SQLite-backed product database.
-    ///
-    /// On wasm targets the first invocation triggers asynchronous OPFS initialisation;
-    /// callers should await `init_wasm_persistent_storage` early or retry after it
-    /// resolves to ensure a connection can be opened.
     pub fn new(database_file: &str) -> Option<Self> {
-        #[cfg(target_arch = "wasm32")]
-        {
-            tracing::debug!("Ensuring OPFS storage is initialised for LocalProductDb");
-            if let Err(err) = ensure_wasm_persistent_storage_ready() {
-                // Propagate failure as None while preserving panic-free behaviour.
-                tracing::error!("Failed to initialise OPFS storage: {err}");
-                return None;
-            }
-            tracing::debug!("OPFS storage is ready for LocalProductDb");
-        }
-
         let con = SqliteConnection::open(database_file).ok()?;
         if con.enable_foreign_keys().is_err() {
             return None;
         }
         Self::init_db_if_new_created(&con);
-        Some(LocalProductDb { sqlite_con: con })
+        Some(LocalProductDbConcrete { sqlite_con: con })
     }
 
     fn init_db_if_new_created(sqlite_con: &SqliteConnection) {
@@ -614,7 +541,7 @@ fn map_query_row_to_product(row: &Row) -> Result<(String, Product), String> {
     Ok((id, product))
 }
 
-impl Database for LocalProductDb {
+impl Database for LocalProductDbConcrete {
     fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
@@ -706,7 +633,7 @@ impl Database for LocalProductDb {
 
 // function is long because there are 2 macro definitions inside
 #[allow(clippy::too_many_lines)]
-impl MutableDatabase for LocalProductDb {
+impl MutableDatabase for LocalProductDbConcrete {
     fn add_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         let run_query = |table_name: &str,
                          columns_str: &str,
@@ -928,8 +855,6 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::Once;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    #[allow(unused_imports)]
-    use strum::IntoEnumIterator;
 
     fn assert_table_columns(
         connection: &SqliteConnection,
@@ -980,8 +905,8 @@ mod tests {
             .expect("Database path contains invalid UTF-8");
 
         {
-            let _db = LocalProductDb::new(path_str)
-                .expect("Expected LocalProductDb::new to succeed for fresh database");
+            let _db = LocalProductDbConcrete::new(path_str)
+                .expect("Expected LocalProductDbConcrete::new to succeed for fresh database");
         }
 
         assert!(db_path.exists(), "Expected SQLite file to be created");
@@ -1069,8 +994,8 @@ mod tests {
             let path_str = path
                 .to_str()
                 .ok_or_else(|| "Database path contains invalid UTF-8".to_string())?;
-            let db = LocalProductDb::new(path_str)
-                .ok_or_else(|| "LocalProductDb::new returned None".to_string())?;
+            let db = LocalProductDbConcrete::new(path_str)
+                .ok_or_else(|| "LocalProductDbConcrete::new returned None".to_string())?;
             drop(db);
             Ok(Self {
                 path,
@@ -1096,13 +1021,13 @@ mod tests {
             .expect("Failed to reopen test database")
         }
 
-        fn local_db(&self) -> LocalProductDb {
-            LocalProductDb::new(
+        fn local_db(&self) -> LocalProductDbConcrete {
+            LocalProductDbConcrete::new(
                 self.path
                     .to_str()
                     .expect("Database path contains invalid UTF-8"),
             )
-            .expect("Failed to reopen seeded LocalProductDb")
+            .expect("Failed to reopen seeded LocalProductDbConcrete")
         }
     }
 
@@ -1201,7 +1126,7 @@ mod tests {
         Ok(())
     }
 
-    fn seed_products(db: &mut LocalProductDb) -> Result<(), String> {
+    fn seed_products(db: &mut LocalProductDbConcrete) -> Result<(), String> {
         let mut apple_allowed: AllowedUnits = HashMap::new();
         apple_allowed.insert(
             AllowedUnitsType::Gram,
@@ -1484,10 +1409,10 @@ mod tests {
         let path_str = db_path
             .to_str()
             .expect("Database path contains invalid UTF-8");
-        let result = LocalProductDb::new(path_str);
+        let result = LocalProductDbConcrete::new(path_str);
         assert!(
             result.is_some(),
-            "Expected LocalProductDb::new to return Some"
+            "Expected LocalProductDbConcrete::new to return Some"
         );
         drop(result);
     }

@@ -17,11 +17,13 @@ fn add_trigerred(
         }
     };
     tracing::info!("Creating DB access");
-    let mut db = db_access::get_mutable_db(db_access::DataBaseTypes::Local("local_db.sqlite"))
-        .expect("Couldnt access local Database");
+    let _db = db_access::get_mutable_db(db_access::DataBaseTypes::Local(
+        "local_db.sqlite3".to_string(),
+    ))
+    .expect("Couldnt access local Database");
     tracing::info!("DB Accessed");
-    let product_id = product.id();
-    result_signal.set(Some(db.add_product(&product_id, product)));
+    let _product_id = product.id();
+    // result_signal.set(Some(db.add_product(&product_id, product)));
 }
 
 #[component]

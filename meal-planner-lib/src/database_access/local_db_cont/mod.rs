@@ -1,7 +1,8 @@
 pub(super) mod local_db;
-mod local_db_concrete;
+
+#[cfg(not(target_arch = "wasm32"))]
+mod local_db_generic;
+#[cfg(target_arch = "wasm32")]
+mod local_db_wasm;
 #[cfg(target_arch = "wasm32")]
 mod wasm_worker_client;
-
-#[cfg(feature = "__internal-wasm-worker-bin")]
-pub use local_db_concrete::LocalProductDb;
