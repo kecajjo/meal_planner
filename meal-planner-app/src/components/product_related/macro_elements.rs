@@ -1,4 +1,4 @@
-use crate::i18n::t;
+use dioxus_i18n::t;
 use dioxus::html::geometry::WheelDelta;
 use dioxus::prelude::*;
 use meal_planner_lib::data_types::{
@@ -17,7 +17,7 @@ fn MacroElementSingleInputField(
 ) -> Element {
     rsx! {
         div {
-            {format!("{}: ", t(label_key))}
+            {format!("{}: ", t!(label_key))}
             if editable {
                 input {
                     class: "nutrient-input",
@@ -161,7 +161,7 @@ pub fn MacroElements(me_signal: Signal<DataMacroElements>, editable: bool) -> El
                 editable,
             }
             div {
-                {format!("{}: ", t("label-calories"))}
+                {format!("{}: ", t!("label-calories"))}
                 {format!("{:.2}", calories)}
             }
         }

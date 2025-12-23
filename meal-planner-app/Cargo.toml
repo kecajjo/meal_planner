@@ -8,13 +8,11 @@ edition = "2021"
 
 [dependencies]
 dioxus = { version = "0.7.1", features = [] }
-fluent-bundle = "0.15"
-once_cell = "1.19"
+dioxus-i18n = "0.5.0"
 tracing = "0.1.43"
 meal-planner-lib = { path = "../meal-planner-lib" }
 strum = "0.27.2"
 strum_macros = "0.27.2"
-unic-langid = { version = "0.9", features = ["macros"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use serde::{Deserialize, Serialize};
@@ -16,6 +17,7 @@ const WORKER_URL: &str = "/meal-planner-lib/local-db/wasm_worker.js";
 
 thread_local! {
     static WORKER: RefCell<Option<Rc<DbWorkerHandle>>> = RefCell::new(None);
+    static INITIALIZED_DB: RefCell<HashSet<String>> = RefCell::new(HashSet::new());
 }
 
 #[derive(Deserialize, Debug)]
@@ -91,7 +93,11 @@ impl LocalProductDbConcrete {
         }
     }
 
-    async fn send_query(&self, sql: String, bind: Vec<Value>) -> Result<Vec<Map<String, Value>>, String> {
+    async fn send_query(
+        &self,
+        sql: String,
+        bind: Vec<Value>,
+    ) -> Result<Vec<Map<String, Value>>, String> {
         let req = json!({
             "type": "Query",
             "database_file": self.key,
@@ -200,9 +206,17 @@ impl LocalProductDbConcrete {
             key: key.to_string(),
         };
 
-        if let Err(e) = db.init_db().await {
-            tracing::error!("Failed to initialise wasm local DB: {e}");
-            return None;
+        if !INITIALIZED_DB
+            .try_with(|cell| cell.borrow().contains(key))
+            .unwrap_or_else(|_| false)
+        {
+            if let Err(e) = db.init_db().await {
+                tracing::error!("Failed to initialise wasm local DB: {e}");
+                return None;
+            }
+            INITIALIZED_DB
+                .try_with(|cell| cell.borrow_mut().insert(key.to_string()))
+                .ok();
         }
         Some(db)
     }
@@ -415,7 +429,7 @@ fn allowed_columns_select() -> String {
 fn build_insert_statements(product_id: &str, product: &Product) -> Vec<SqlStatement> {
     let mut stmts = Vec::new();
     stmts.push(SqlStatement {
-        sql: "INSERT OR REPLACE INTO products (id, name, brand) VALUES (?, ?, ?);".to_string(),
+        sql: "INSERT INTO products (id, name, brand) VALUES (?, ?, ?);".to_string(),
         bind: Some(vec![
             product_id.into(),
             product.name().into(),
@@ -441,7 +455,7 @@ fn build_insert_statements(product_id: &str, product: &Product) -> Vec<SqlStatem
     macro_bind_all.extend(macro_binds);
     stmts.push(SqlStatement {
         sql: format!(
-            "INSERT OR REPLACE INTO macro_elements (id, {cols}) VALUES ({ph});",
+            "INSERT INTO macro_elements (id, {cols}) VALUES ({ph});",
             cols = macro_cols,
             ph = macro_placeholders
         ),
@@ -467,7 +481,7 @@ fn build_insert_statements(product_id: &str, product: &Product) -> Vec<SqlStatem
     }
     stmts.push(SqlStatement {
         sql: format!(
-            "INSERT OR REPLACE INTO micronutrients (id, {cols}) VALUES ({ph});",
+            "INSERT INTO micronutrients (id, {cols}) VALUES ({ph});",
             cols = micro_cols,
             ph = micro_placeholders
         ),
@@ -497,7 +511,7 @@ fn build_insert_statements(product_id: &str, product: &Product) -> Vec<SqlStatem
     }
     stmts.push(SqlStatement {
         sql: format!(
-            "INSERT OR REPLACE INTO allowed_units (id, {cols}) VALUES ({ph});",
+            "INSERT INTO allowed_units (id, {cols}) VALUES ({ph});",
             cols = allowed_cols,
             ph = allowed_placeholders
         ),

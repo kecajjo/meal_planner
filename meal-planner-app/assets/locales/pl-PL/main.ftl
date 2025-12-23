@@ -32,6 +32,20 @@ action-meal-plan = Plan posilkow
 action-swap-foods = Zamien produkty
 action-db-manager = Menedzer bazy
 action-language = Jezyk
+action-modify = Edytuj
 lang-english = Angielski
 lang-polish = Polski
 action-add = Dodaj
+label-product = Produkt
+label-product-plural = Produkty
+label-product-count = { $count ->
+    [one] Produkt
+    [few] Produkty
+    [many] Produktów
+    *[other] Produkty
+}
+add-product-sentence = { action-add } { label-product }
+error-no-product = Brak produktu do dodania
+error-db-access = Brak dostepu do lokalnej bazy
+popup-product-added = Produkt dodany pomyslnie
+popup-error = Blad

@@ -1,6 +1,6 @@
-use crate::i18n::t;
 use dioxus::html::geometry::WheelDelta;
 use dioxus::prelude::*;
+use dioxus_i18n::t;
 use meal_planner_lib::data_types::{AllowedUnits as DataAllowedUnits, AllowedUnitsType, UnitData};
 use std::collections::HashSet;
 use strum::IntoEnumIterator;
@@ -19,13 +19,13 @@ fn unit_from_value(value: &str) -> Option<AllowedUnitsType> {
 
 fn unit_label(unit: AllowedUnitsType) -> String {
     match unit {
-        AllowedUnitsType::Gram => t("au-unit-gram"),
-        AllowedUnitsType::Piece => t("au-unit-piece"),
-        AllowedUnitsType::Cup => t("au-unit-cup"),
-        AllowedUnitsType::Tablespoon => t("au-unit-tablespoon"),
-        AllowedUnitsType::Teaspoon => t("au-unit-teaspoon"),
-        AllowedUnitsType::Box => t("au-unit-box"),
-        AllowedUnitsType::Custom => t("au-unit-custom"),
+        AllowedUnitsType::Gram => t!("au-unit-gram"),
+        AllowedUnitsType::Piece => t!("au-unit-piece"),
+        AllowedUnitsType::Cup => t!("au-unit-cup"),
+        AllowedUnitsType::Tablespoon => t!("au-unit-tablespoon"),
+        AllowedUnitsType::Teaspoon => t!("au-unit-teaspoon"),
+        AllowedUnitsType::Box => t!("au-unit-box"),
+        AllowedUnitsType::Custom => t!("au-unit-custom"),
     }
 }
 
@@ -96,13 +96,12 @@ pub fn AllowedUnits(ad_signal: Signal<DataAllowedUnits>, editable: bool) -> Elem
     let add_target = AllowedUnitsType::iter()
         .filter(|unit| *unit != AllowedUnitsType::Gram)
         .find(|unit| !used_units.contains(unit));
-    let disable_remove = rows.len() <= 1;
 
     rsx! {
         div { class: "allowed-section",
             for (row_index , (unit , data)) in rows.iter().copied().enumerate() {
                 div { class: "allowed-row",
-                    span { class: "allowed-label", {t("au-unit")} }
+                    span { class: "allowed-label", {t!("au-unit")} }
                     if editable {
                         select {
                             class: "allowed-select",
@@ -134,7 +133,7 @@ pub fn AllowedUnits(ad_signal: Signal<DataAllowedUnits>, editable: bool) -> Elem
                     } else {
                         span { class: "allowed-value", {unit_label(unit)} }
                     }
-                    span { class: "allowed-label", {t("au-amount")} }
+                    span { class: "allowed-label", {t!("au-amount")} }
                     if editable {
                         input {
                             class: "allowed-input nutrient-input",
@@ -174,15 +173,14 @@ pub fn AllowedUnits(ad_signal: Signal<DataAllowedUnits>, editable: bool) -> Elem
                     if editable {
                         button {
                             class: "allowed-remove",
-                            disabled: disable_remove,
                             onclick: move |_| {
                                 let mut rows = rows_signal();
-                                if rows.len() > 1 && row_index < rows.len() {
+                                if row_index < rows.len() {
                                     rows.remove(row_index);
                                     rows_signal.set(rows);
                                 }
                             },
-                            {t("au-delete")}
+                            {t!("au-delete")}
                         }
                     }
                 }
@@ -202,7 +200,7 @@ pub fn AllowedUnits(ad_signal: Signal<DataAllowedUnits>, editable: bool) -> Elem
                             rows_signal.set(rows);
                         }
                     },
-                    {t("au-add")}
+                    {t!("au-add")}
                 }
             }
         }

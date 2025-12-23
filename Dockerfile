@@ -161,6 +161,13 @@ RUN apt-get update && \
     apt-get install -y nodejs clang && \
     rm -rf /var/lib/apt/lists/*
 
+RUN apt update && \
+    apt install -y debian-keyring debian-archive-keyring apt-transport-https && \
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list && \
+    apt update && \
+    apt install -y caddy
+
 ENV PATH="/usr/local/cargo/bin:/home/developer/.cargo/bin:/usr/local/bin:/home/developer/.local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:$PATH"
 ENV ANDROID_HOME=/opt/android-sdk
 ENV ANDROID_NDK_HOME=/opt/android-sdk/ndk/25.2.9519653

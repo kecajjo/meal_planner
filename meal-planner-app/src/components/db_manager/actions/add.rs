@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::components::product_related::Product;
-use crate::i18n::t;
+use dioxus_i18n::t;
 use meal_planner_lib::data_types as data;
 use meal_planner_lib::database_access as db_access;
 
@@ -12,7 +12,7 @@ fn add_trigerred(
     let product = match input() {
         Some(prod) => prod,
         None => {
-            result_signal.set(Some(Err("No product to add".to_string())));
+            result_signal.set(Some(Err(t!("error-no-product"))));
             return;
         }
     };
@@ -27,7 +27,7 @@ fn add_trigerred(
             ))
             .await
             else {
-                result_signal.set(Some(Err("Couldnt access local Database".to_string())));
+                result_signal.set(Some(Err(t!("error-db-access"))));
                 return;
             };
             tracing::info!("DB Accessed");
@@ -52,20 +52,20 @@ pub fn Add() -> Element {
     });
 
     let popup_message = match result_signal() {
-        Some(Ok(_)) => Some("Product added successfully".to_string()),
-        Some(Err(err)) => Some(format!("Error: {err}")),
+        Some(Ok(_)) => Some(t!("popup-product-added")),
+        Some(Err(err)) => Some(format!("{}: {err}", t!("popup-error"))),
         None => None,
     };
     let show_popup = show_popup_signal();
 
     rsx!(
         div {
-            "Add Component:"
+            span { {t!("add-product-sentence")} }
             Product { product_signal, editable: true }
             button {
                 class: "db-add-btn",
                 onclick: move |_| add_trigerred(product_signal, result_signal),
-                {t("action-add")}
+                {t!("action-add")}
             }
             if show_popup {
                 if let Some(message) = popup_message.clone() {

@@ -1,5 +1,5 @@
 use super::{AllowedUnits, MacroElements, MicroNutrients};
-use crate::i18n::t;
+use dioxus_i18n::t;
 use dioxus::prelude::*;
 use meal_planner_lib::data_types as data;
 use std::rc::Rc;
@@ -21,7 +21,7 @@ fn EditableTextInput(
 ) -> Element {
     rsx! {
         div {
-            {format!("{}: ", t(label_key))}
+            {format!("{}: ", t!(label_key))}
             if editable {
                 input {
                     value: signal(),
@@ -133,7 +133,7 @@ pub fn Product(product_signal: Signal<Option<data::Product>>, editable: bool) ->
                     class: "collapsible__header",
                     onclick: move |_| macro_open.set(!macro_open()),
                     span { class: "collapsible__chevron", {if macro_open() { "▾" } else { "▸" }} }
-                    span { class: "collapsible__title", {t("label-macro-elements")} }
+                    span { class: "collapsible__title", {t!("label-macro-elements")} }
                 }
                 if macro_open() {
                     div { class: "collapsible__content",
@@ -146,7 +146,7 @@ pub fn Product(product_signal: Signal<Option<data::Product>>, editable: bool) ->
                     class: "collapsible__header",
                     onclick: move |_| micro_open.set(!micro_open()),
                     span { class: "collapsible__chevron", {if micro_open() { "▾" } else { "▸" }} }
-                    span { class: "collapsible__title", {t("label-micro-nutrients")} }
+                    span { class: "collapsible__title", {t!("label-micro-nutrients")} }
                 }
                 if micro_open() {
                     div { class: "collapsible__content",
@@ -161,7 +161,7 @@ pub fn Product(product_signal: Signal<Option<data::Product>>, editable: bool) ->
                     span { class: "collapsible__chevron",
                         {if allowed_units_open() { "▾" } else { "▸" }}
                     }
-                    span { class: "collapsible__title", {t("label-allowed-units")} }
+                    span { class: "collapsible__title", {t!("label-allowed-units")} }
                 }
                 if allowed_units_open() {
                     div { class: "collapsible__content",

@@ -1,4 +1,4 @@
-use crate::i18n::t;
+use dioxus_i18n::t;
 use dioxus::html::geometry::WheelDelta;
 use dioxus::prelude::*;
 use meal_planner_lib::data_types::{
@@ -13,15 +13,15 @@ fn MicroNutrientInput(
     mn_signal: Signal<DataMicroNutrients>,
     editable: bool,
 ) -> Element {
-    let none_label = t("mn-none");
-    let no_data_label = t("mn-no-data");
+    let none_label = t!("mn-none");
+    let no_data_label = t!("mn-no-data");
     let is_none = signal().is_none();
     let disabled_key = format!("mn-{mn_type:?}-disabled");
     let enabled_key = format!("mn-{mn_type:?}-enabled");
 
     rsx! {
         div { class: "micro-row",
-            span { class: "micro-label", {format!("{}:", t(label_key))} }
+            span { class: "micro-label", {format!("{}:", t!(label_key))} }
             if editable {
                 span { class: "micro-controls",
                     if is_none {

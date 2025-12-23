@@ -1,11 +1,11 @@
-use super::actions::{add, copy, modify};
+use super::actions::{add, modify};
 use dioxus::prelude::*;
+use dioxus_i18n::t;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum DbActionKinds {
     Add,
     Modify,
-    Copy,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -16,16 +16,12 @@ struct ButtonData {
 
 static BUTTONS: &[ButtonData] = &[
     ButtonData {
-        label: "Add",
+        label: "action-add",
         action: DbActionKinds::Add,
     },
     ButtonData {
-        label: "Modify",
+        label: "action-modify",
         action: DbActionKinds::Modify,
-    },
-    ButtonData {
-        label: "Copy",
-        action: DbActionKinds::Copy,
     },
 ];
 
@@ -48,7 +44,7 @@ pub fn DbManagerView() -> Element {
                     let mut selected_action = selected_action;
                     selected_action.set(btn_data.action);
                 },
-                "{btn_data.label}"
+                {t!(btn_data.label)}
             }
         )
     });
@@ -64,9 +60,6 @@ pub fn DbManagerView() -> Element {
                     },
                     DbActionKinds::Modify => rsx! {
                         modify::Modify {}
-                    },
-                    DbActionKinds::Copy => rsx! {
-                        copy::Copy {}
                     },
                 }
             }
