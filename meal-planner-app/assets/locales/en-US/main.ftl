@@ -1,3 +1,10 @@
+search-loading = Searching…
+search-button = Search
+search-placeholder = Product ID…
+search-empty-prompt = Type a product ID and press Enter or Search
+search-no-results = No products found
+search-product-details = Product Details
+db-type-local = Saved
 label-name = Name
 label-brand = Brand
 label-macro-elements = Macro Elements

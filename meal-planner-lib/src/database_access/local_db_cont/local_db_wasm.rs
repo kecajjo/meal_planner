@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use serde::{Deserialize, Serialize};
@@ -250,7 +250,7 @@ impl Database for LocalProductDbConcrete {
     async fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
-    ) -> HashMap<String, Product> {
+    ) -> BTreeMap<String, Product> {
         let (sql, bind) = build_select_query(criteria);
         match self.send_query(sql, bind).await {
             Ok(rows) => rows
@@ -265,7 +265,7 @@ impl Database for LocalProductDbConcrete {
                 .collect(),
             Err(e) => {
                 tracing::error!("worker query failed: {e}");
-                HashMap::new()
+                BTreeMap::new()
             }
         }
     }

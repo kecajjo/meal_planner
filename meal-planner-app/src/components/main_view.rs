@@ -14,7 +14,7 @@ pub enum ViewKind {
 #[component]
 pub fn MainView(selection: Signal<ViewKind>) -> Element {
     rsx! {
-        main { class: "flex-1 p-4 overflow-y-auto min-h-0", role: "main",
+        main { class: "content-shell app-theme", role: "main",
             match selection() {
                 ViewKind::MealPlan => rsx! {
                     MealPlanView {}

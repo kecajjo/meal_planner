@@ -7,6 +7,7 @@ mod components;
 
 use components::{
     action_bar::ActionBar,
+    layout::SidebarLayoutContext,
     main_view::{MainView, ViewKind},
 };
 
@@ -40,6 +41,9 @@ fn App() -> Element {
     });
     let selection = use_signal(|| ViewKind::MealPlan);
     let sidebar_open = use_signal(|| false);
+    let sidebar_width = use_signal(|| 224.0_f32);
+
+    use_context_provider(|| SidebarLayoutContext { sidebar_width });
 
     // The `rsx!` macro lets us define HTML inside of rust. It expands to an Element with all of our HTML inside.
     rsx! {
@@ -51,8 +55,8 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: DB_MANAGER_CSS }
         document::Link { rel: "stylesheet", href: PRODUCT_RELATED_CSS }
 
-        div { class: "app-shell text-slate-900",
-            ActionBar { selection, sidebar_open }
+        div { class: "app-shell", style: format!("--action-bar-width: {}px;", sidebar_width()),
+            ActionBar { selection, sidebar_open, sidebar_width }
             MainView { selection }
         }
     }

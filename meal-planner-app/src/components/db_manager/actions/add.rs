@@ -23,7 +23,7 @@ fn add_trigerred(
         async move {
             tracing::info!("Creating DB access");
             let Some(mut db) = db_access::get_mutable_db(db_access::DataBaseTypes::Local(
-                "local_db.sqlite3".to_string(),
+                db_access::LOCAL_DB_DEFAULT_FILE.to_string(),
             ))
             .await
             else {

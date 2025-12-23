@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::data_types::{AllowedUnitsType, Product, UnitData};
 use crate::database_access::{Database, DbSearchCriteria, MutableDatabase};
@@ -32,7 +32,7 @@ impl Database for LocalProductDb {
     async fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
-    ) -> HashMap<String, Product> {
+    ) -> BTreeMap<String, Product> {
         self.inner.get_products_matching_criteria(criteria).await
     }
 

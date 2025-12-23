@@ -15,6 +15,12 @@ struct SwipeSession {
     start_x: f32,
 }
 
+#[derive(Clone, Copy)]
+struct ResizeSession {
+    start_x: f32,
+    start_width: f32,
+}
+
 #[derive(Clone, Copy, Debug)]
 enum SwipeDirection {
     Opening,
@@ -28,6 +34,13 @@ impl SwipeDirection {
             SwipeDirection::Closing => start - current,
         }
     }
+}
+
+const SIDEBAR_MIN_WIDTH: f32 = 160.0; // 10rem baseline
+const SIDEBAR_MAX_WIDTH: f32 = 320.0; // 20rem baseline
+
+fn clamp_sidebar_width(width: f32) -> f32 {
+    width.clamp(SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH)
 }
 #[cfg(not(target_os = "android"))]
 mod non_android_constants {
@@ -48,10 +61,15 @@ use android_constants::*;
 use non_android_constants::*;
 
 #[component]
-pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>) -> Element {
+pub fn ActionBar(
+    mut selection: Signal<ViewKind>,
+    mut sidebar_open: Signal<bool>,
+    mut sidebar_width: Signal<f32>,
+) -> Element {
     let mut locale = use_signal(|| i18n().language().to_string());
     let open_swipe = use_signal(|| None::<SwipeSession>);
     let close_swipe = use_signal(|| None::<SwipeSession>);
+    let mut resize_session = use_signal(|| None::<ResizeSession>);
     // Only track pointer_down_time on non-wasm targets
     #[cfg(not(target_arch = "wasm32"))]
     let pointer_down_time = use_signal(|| None::<time::Instant>);
@@ -96,21 +114,45 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                 },
             }
         }
+
+        if let Some(resize_state) = resize_session() {
+            div {
+                class: "action-bar__resize-overlay",
+                onpointermove: move |evt| {
+                    let delta = pointer_x(&evt) - resize_state.start_x;
+                    let next = clamp_sidebar_width(resize_state.start_width + delta);
+                    sidebar_width.set(next);
+                },
+                onpointerup: move |_| {
+                    resize_session.set(None);
+                },
+            }
+        }
         // side bar
         nav {
             class: nav_class,
             onpointerdown: move |evt| {
-                if !sidebar_open() {
+                if !sidebar_open() || resize_session().is_some() {
                     return;
                 }
                 begin_swipe(close_swipe, &evt);
             },
             onpointerup: move |evt| {
+                if let Some(_) = resize_session() {
+                    resize_session.set(None);
+                    return;
+                }
                 calc_swipe(SwipeDirection::Closing, close_swipe, &evt, sidebar_open, false);
                 cancel_swipe(close_swipe);
             },
             onpointermove: move |evt| {
-                calc_swipe(SwipeDirection::Closing, close_swipe, &evt, sidebar_open, false);
+                if let Some(resize_state) = resize_session() {
+                    let delta = pointer_x(&evt) - resize_state.start_x;
+                    let next = clamp_sidebar_width(resize_state.start_width + delta);
+                    sidebar_width.set(next);
+                } else {
+                    calc_swipe(SwipeDirection::Closing, close_swipe, &evt, sidebar_open, false);
+                }
             },
             // visible only on small screens when side bar is open
             button {
@@ -158,6 +200,17 @@ pub fn ActionBar(mut selection: Signal<ViewKind>, mut sidebar_open: Signal<bool>
                     for (code , label_key) in LANG_OPTIONS {
                         option { value: code, selected: locale() == code, {t!(label_key)} }
                     }
+                }
+                div {
+                    class: "action-bar__resize-handle",
+                    role: "separator",
+                    aria_label: "Resize sidebar",
+                    onpointerdown: move |evt| {
+                        resize_session.set(Some(ResizeSession {
+                            start_x: pointer_x(&evt),
+                            start_width: sidebar_width(),
+                        }));
+                    },
                 }
             }
         }

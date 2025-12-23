@@ -1,6 +1,6 @@
 use super::{AllowedUnits, MacroElements, MicroNutrients};
-use dioxus_i18n::t;
 use dioxus::prelude::*;
+use dioxus_i18n::t;
 use meal_planner_lib::data_types as data;
 use std::rc::Rc;
 

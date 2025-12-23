@@ -1,6 +1,6 @@
 use core::fmt;
 use core::fmt::Write;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryFrom;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
@@ -547,7 +547,7 @@ impl Database for LocalProductDbConcrete {
     async fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
-    ) -> HashMap<String, Product> {
+    ) -> BTreeMap<String, Product> {
         let mut query_template = format!(
             "SELECT {p}.id, {p}.name, {p}.brand",
             p = SqlTablesNames::Products
@@ -602,7 +602,7 @@ impl Database for LocalProductDbConcrete {
             .query_map(&query_template, map_query_row_to_product)
             .unwrap_or_else(|e| panic!("Failed to map query results: {e}"));
 
-        let mut result_map = HashMap::new();
+        let mut result_map = BTreeMap::new();
         result_map.extend(products);
         result_map
     }

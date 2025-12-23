@@ -1,6 +1,6 @@
 use core::panic;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::data_types::{Product, UnitData};
 use async_trait::async_trait;
@@ -16,6 +16,8 @@ pub enum DataBaseTypes {
     OpenFoodFacts,
     Local(String),
 }
+
+pub const LOCAL_DB_DEFAULT_FILE: &str = "local_db.sqlite3";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DbSearchCriteria {
@@ -73,7 +75,7 @@ pub trait Database {
     async fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
-    ) -> HashMap<String, crate::data_types::Product>;
+    ) -> BTreeMap<String, crate::data_types::Product>;
 
     async fn set_product_unit(
         &mut self,
@@ -145,9 +147,9 @@ mod dbwrapper_trait_default_impl_tests {
         async fn get_products_matching_criteria(
             &self,
             criteria: &[DbSearchCriteria],
-        ) -> HashMap<String, Product> {
+        ) -> BTreeMap<String, Product> {
             // Only ById supported for this dummy
-            let mut map = HashMap::new();
+            let mut map = BTreeMap::new();
             for crit in criteria {
                 // TODO: wont be necessary when there are more different criteria
                 #[allow(irrefutable_let_patterns)]

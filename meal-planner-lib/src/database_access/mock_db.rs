@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use super::db_wrapper::{Database, DbSearchCriteria, MutableDatabase};
 use crate::data_types::{MacroElements, MicroNutrients, MicroNutrientsType, Product, UnitData};
@@ -205,14 +205,14 @@ impl Database for MockProductDb {
     async fn get_products_matching_criteria(
         &self,
         criteria: &[DbSearchCriteria],
-    ) -> HashMap<String, crate::data_types::Product> {
+    ) -> BTreeMap<String, crate::data_types::Product> {
         let is_prod_matching_crit = |product: &Product, criterion: &DbSearchCriteria| -> bool {
             match criterion {
                 DbSearchCriteria::ById(name_crit) => product.id().starts_with(name_crit),
             }
         };
 
-        let mut results = HashMap::new();
+        let mut results = BTreeMap::new();
 
         for (name, product) in &self.products {
             if criteria

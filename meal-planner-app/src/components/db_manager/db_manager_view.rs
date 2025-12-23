@@ -14,16 +14,10 @@ struct ButtonData {
     action: DbActionKinds,
 }
 
-static BUTTONS: &[ButtonData] = &[
-    ButtonData {
-        label: "action-add",
-        action: DbActionKinds::Add,
-    },
-    ButtonData {
-        label: "action-search",
-        action: DbActionKinds::Search,
-    },
-];
+static BUTTONS: &[ButtonData] = &[ButtonData {
+    label: "action-add",
+    action: DbActionKinds::Add,
+}];
 
 #[component]
 pub fn DbManagerView() -> Element {
@@ -49,20 +43,26 @@ pub fn DbManagerView() -> Element {
         )
     });
 
-    rsx! {
-        nav { class: "view-content",
-            "Add or modify products"
-            nav { class: "navigation-button-bar", {buttons_elems} }
+    match curr_action {
+        DbActionKinds::Add => rsx! {
+            // Arrow-like button to go back to Search
             div {
-                match curr_action {
-                    DbActionKinds::Add => rsx! {
-                        add::Add {}
+                button {
+                    class: "arrow-back-button",
+                    onclick: move |_| {
+                        let mut selected_action = selected_action;
+                        selected_action.set(DbActionKinds::Search);
                     },
-                    DbActionKinds::Search => rsx! {
-                        search::Search {}
-                    },
+                    "← Back"
                 }
             }
-        }
+            div { class: "view-content", add::Add {} }
+        },
+        DbActionKinds::Search => rsx! {
+            nav { class: "view-content",
+                nav { class: "navigation-button-bar", {buttons_elems} }
+                div { search::Search {} }
+            }
+        },
     }
 }
