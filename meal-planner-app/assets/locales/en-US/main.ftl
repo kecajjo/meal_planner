@@ -30,19 +30,20 @@ action-open-navigation = Open navigation
 action-close-navigation = Close navigation
 action-meal-plan = Meal Plan
 action-swap-foods = Swap Foods
-action-db-manager = DB Manager
+action-db-manager = Products
 action-language = Language
 action-modify = Edit
 lang-english = English
 lang-polish = Polish
-action-add = Add
+action-add = Add new {label-product}
+action-search = Search
 label-product = Product
 label-product-plural = Products
 label-product-count = { $count ->
     [one] Product
     *[other] Products
 }
-add-product-sentence = { action-add } { label-product }
+add-product-sentence = { action-add } product
 error-no-product = No product to add
 error-db-access = Could not access local database
 popup-product-added = Product added successfully

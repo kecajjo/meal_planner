@@ -30,12 +30,13 @@ action-open-navigation = Otworz nawigacje
 action-close-navigation = Zamknij nawigacje
 action-meal-plan = Plan posilkow
 action-swap-foods = Zamien produkty
-action-db-manager = Menedzer bazy
+action-db-manager = Produkty
 action-language = Jezyk
 action-modify = Edytuj
 lang-english = Angielski
 lang-polish = Polski
-action-add = Dodaj
+action-add = Dodaj nowy { lablel-product}
+action-search = Szukaj
 label-product = Produkt
 label-product-plural = Produkty
 label-product-count = { $count ->
@@ -44,7 +45,7 @@ label-product-count = { $count ->
     [many] Produktów
     *[other] Produkty
 }
-add-product-sentence = { action-add } { label-product }
+add-product-sentence = { action-add } produkt
 error-no-product = Brak produktu do dodania
 error-db-access = Brak dostepu do lokalnej bazy
 popup-product-added = Produkt dodany pomyslnie

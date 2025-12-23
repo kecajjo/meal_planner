@@ -1,11 +1,11 @@
-use super::actions::{add, modify};
+use super::actions::{add, search};
 use dioxus::prelude::*;
 use dioxus_i18n::t;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum DbActionKinds {
     Add,
-    Modify,
+    Search,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -20,14 +20,14 @@ static BUTTONS: &[ButtonData] = &[
         action: DbActionKinds::Add,
     },
     ButtonData {
-        label: "action-modify",
-        action: DbActionKinds::Modify,
+        label: "action-search",
+        action: DbActionKinds::Search,
     },
 ];
 
 #[component]
 pub fn DbManagerView() -> Element {
-    let selected_action = use_signal(|| DbActionKinds::Add);
+    let selected_action = use_signal(|| DbActionKinds::Search);
 
     let curr_action = *selected_action.read();
     let buttons_elems = BUTTONS.iter().map(|btn_data| {
@@ -58,8 +58,8 @@ pub fn DbManagerView() -> Element {
                     DbActionKinds::Add => rsx! {
                         add::Add {}
                     },
-                    DbActionKinds::Modify => rsx! {
-                        modify::Modify {}
+                    DbActionKinds::Search => rsx! {
+                        search::Search {}
                     },
                 }
             }
