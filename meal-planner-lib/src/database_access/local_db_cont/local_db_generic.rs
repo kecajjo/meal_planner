@@ -754,74 +754,106 @@ impl MutableDatabase for LocalProductDbConcrete {
     }
 
     async fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
-        let run_query = |table: &str, col: &str, val: &str| {
+        let run_exec = |sql: String| {
             self.sqlite_con
-                .execute(&format!(
-                    "UPDATE {table} SET \"{col}\" = {val} where id = '{product_id}';"
-                ))
-                .unwrap_or_else(|_| panic!("Failed to update {col} for {product_id}"));
+                .execute(&sql)
+                .map_err(|e| format!("Failed to upsert product '{product_id}': {e}"))
         };
 
-        for (col, val) in [
-            ("name", format!("'{}'", product.name())),
-            (
-                "brand",
-                match product.brand() {
-                    Some(brand) => format!("'{brand}'"),
-                    None => "NULL".to_string(),
-                },
-            ),
-        ] {
-            run_query(&SqlTablesNames::Products.to_string(), col, &val);
-        }
+        let brand_sql = match product.brand() {
+            Some(brand) => format!("'{brand}'"),
+            None => "NULL".to_string(),
+        };
+        run_exec(format!(
+            "INSERT INTO {table} (id, name, brand) VALUES ('{id}', '{name}', {brand}) \
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name, brand = excluded.brand;",
+            table = SqlTablesNames::Products,
+            id = product_id,
+            name = product.name(),
+            brand = brand_sql,
+        ))?;
 
-        for (col, val) in product
-            .macro_elements
-            .into_iter()
-            .filter(|x| MacroElementsType::Calories != x.0)
-        {
-            run_query(
-                &SqlTablesNames::MacroElements.to_string(),
-                &col.to_string(),
-                &val.to_string(),
-            );
-        }
+        let macro_cols: Vec<String> = MacroElementsType::iter()
+            .filter(|m| *m != MacroElementsType::Calories)
+            .map(|m| format!("\"{m}\""))
+            .collect();
+        let macro_values: Vec<String> = MacroElementsType::iter()
+            .filter(|m| *m != MacroElementsType::Calories)
+            .map(|m| product.macro_elements[m].to_string())
+            .collect();
+        let macro_updates = macro_cols
+            .iter()
+            .map(|c| format!("{c} = excluded.{c}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        run_exec(format!(
+            "INSERT INTO {table} (id, {cols}) VALUES ('{id}', {vals}) \
+             ON CONFLICT(id) DO UPDATE SET {updates};",
+            table = SqlTablesNames::MacroElements,
+            cols = macro_cols.join(", "),
+            vals = macro_values.join(", "),
+            updates = macro_updates,
+            id = product_id,
+        ))?;
 
-        for col in MicroNutrientsType::iter() {
-            let value = if product.micro_nutrients[col].is_some() {
-                product.micro_nutrients[col].unwrap().to_string()
-            } else {
-                "NULL".to_string()
-            };
-            run_query(
-                &SqlTablesNames::MicroNutrients.to_string(),
-                &col.to_string(),
-                &value,
-            );
-        }
+        let micro_cols: Vec<String> = MicroNutrientsType::iter()
+            .map(|m| format!("\"{m}\""))
+            .collect();
+        let micro_values: Vec<String> = MicroNutrientsType::iter()
+            .map(|m| match product.micro_nutrients[m] {
+                Some(v) => v.to_string(),
+                None => "NULL".to_string(),
+            })
+            .collect();
+        let micro_updates = micro_cols
+            .iter()
+            .map(|c| format!("{c} = excluded.{c}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        run_exec(format!(
+            "INSERT INTO {table} (id, {cols}) VALUES ('{id}', {vals}) \
+             ON CONFLICT(id) DO UPDATE SET {updates};",
+            table = SqlTablesNames::MicroNutrients,
+            cols = micro_cols.join(", "),
+            vals = micro_values.join(", "),
+            updates = micro_updates,
+            id = product_id,
+        ))?;
 
-        for col in AllowedUnitsType::iter() {
-            let value = if product.allowed_units.contains_key(&col) {
-                product.allowed_units.get(&col).unwrap().amount.to_string()
-            } else {
-                "NULL".to_string()
-            };
-            run_query(
-                &SqlTablesNames::AllowedUnits.to_string(),
-                &col.to_string(),
-                &value,
+        let allowed_cols: Vec<String> = AllowedUnitsType::iter()
+            .flat_map(|u| {
+                let base = u.to_string();
+                vec![format!("\"{base}\""), format!("\"{base} divider\"")]
+            })
+            .collect();
+        let mut allowed_values = Vec::with_capacity(allowed_cols.len());
+        for unit in AllowedUnitsType::iter() {
+            let entry = product.allowed_units.get(&unit);
+            allowed_values.push(
+                entry
+                    .map(|u| u.amount.to_string())
+                    .unwrap_or_else(|| "NULL".to_string()),
             );
-            let divider_value = if product.allowed_units.contains_key(&col) {
-                product.allowed_units.get(&col).unwrap().divider.to_string()
-            } else {
-                "NULL".to_string()
-            };
-            run_query(
-                &SqlTablesNames::AllowedUnits.to_string(),
-                &(col.to_string() + " divider"),
-                &divider_value,
+            allowed_values.push(
+                entry
+                    .map(|u| u.divider.to_string())
+                    .unwrap_or_else(|| "NULL".to_string()),
             );
         }
+        let allowed_updates = allowed_cols
+            .iter()
+            .map(|c| format!("{c} = excluded.{c}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        run_exec(format!(
+            "INSERT INTO {table} (id, {cols}) VALUES ('{id}', {vals}) \
+             ON CONFLICT(id) DO UPDATE SET {updates};",
+            table = SqlTablesNames::AllowedUnits,
+            cols = allowed_cols.join(", "),
+            vals = allowed_values.join(", "),
+            updates = allowed_updates,
+            id = product_id,
+        ))?;
 
         Ok(())
     }
@@ -1421,5 +1453,84 @@ mod tests {
             "Expected LocalProductDbConcrete::new to return Some"
         );
         drop(result);
+    }
+
+    #[test]
+    fn test_09_update_product_inserts_when_missing() {
+        let test_db = TestDbGuard::create_empty().expect("Failed to prepare empty database");
+        let mut db = test_db.local_db();
+
+        let mut allowed_units: AllowedUnits = HashMap::new();
+        allowed_units.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 1,
+                divider: 1,
+            },
+        );
+        allowed_units.insert(
+            AllowedUnitsType::Custom,
+            UnitData {
+                amount: 250,
+                divider: 2,
+            },
+        );
+
+        let mut micro = Box::new(MicroNutrients::default());
+        micro[MicroNutrientsType::Fiber] = Some(1.5_f32);
+
+        let product = Product::new(
+            "Kiwi".to_string(),
+            Some("FreshCo".to_string()),
+            Box::new(MacroElements::new(
+                0.4_f32, 0.1_f32, 15.0_f32, 9.0_f32, 1.1_f32,
+            )),
+            micro,
+            allowed_units,
+        );
+
+        let product_id = product.id();
+        assert!(
+            block_on(db.update_product(product_id.as_str(), product)).is_ok(),
+            "Expected update_product to insert when missing"
+        );
+
+        let conn = test_db.connection();
+        let name = conn
+            .query_first(
+                format!("SELECT name FROM products WHERE id = '{product_id}';").as_str(),
+                |row| row.get_string(0),
+            )
+            .expect("Failed to read inserted product")
+            .expect("Missing inserted product");
+        assert_eq!(name, "Kiwi");
+
+        let fiber = conn
+            .query_first(
+                format!("SELECT Fiber FROM micronutrients WHERE id = '{product_id}';").as_str(),
+                |row| row.get_f32_optional(0),
+            )
+            .expect("Failed to fetch inserted micronutrient")
+            .expect("Missing inserted micronutrient value");
+        assert_eq!(fiber, Some(1.5_f32));
+
+        let custom_amount = conn
+            .query_first(
+                format!("SELECT custom FROM allowed_units WHERE id = '{product_id}';").as_str(),
+                |row| row.get_u16_optional(0),
+            )
+            .expect("Failed to fetch inserted allowed unit")
+            .expect("Missing custom unit amount");
+        assert_eq!(custom_amount, Some(250));
+
+        let gram_divider = conn
+            .query_first(
+                format!("SELECT \"gram divider\" FROM allowed_units WHERE id = '{product_id}';")
+                    .as_str(),
+                |row| row.get_u16_optional(0),
+            )
+            .expect("Failed to fetch gram divider")
+            .expect("Missing gram divider");
+        assert_eq!(gram_divider, Some(1));
     }
 }

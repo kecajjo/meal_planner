@@ -301,62 +301,122 @@ impl MutableDatabase for LocalProductDbConcrete {
     async fn update_product(&mut self, product_id: &str, product: Product) -> Result<(), String> {
         let mut stmts = Vec::new();
         stmts.push(SqlStatement {
-            sql: "UPDATE products SET name = ?, brand = ? WHERE id = ?;".to_string(),
+            sql: "INSERT INTO products (id, name, brand) VALUES (?, ?, ?) \
+                  ON CONFLICT(id) DO UPDATE SET name = excluded.name, brand = excluded.brand;"
+                .to_string(),
             bind: Some(vec![
+                product_id.into(),
                 product.name().into(),
                 product.brand().map(|b| b.into()).unwrap_or(Value::Null),
-                product_id.into(),
             ]),
         });
 
-        for macro_type in MacroElementsType::iter() {
-            if macro_type == MacroElementsType::Calories {
+        let macro_cols: Vec<String> = MacroElementsType::iter()
+            .filter(|m| *m != MacroElementsType::Calories)
+            .map(|m| m.to_string())
+            .collect();
+        let macro_placeholders = std::iter::repeat("?")
+            .take(macro_cols.len() + 1)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let macro_updates = macro_cols
+            .iter()
+            .map(|c| format!("\"{c}\" = excluded.\"{c}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut macro_bind_all = Vec::with_capacity(macro_cols.len() + 1);
+        macro_bind_all.push(Value::from(product_id));
+        for m in MacroElementsType::iter() {
+            if m == MacroElementsType::Calories {
                 continue;
             }
-            stmts.push(SqlStatement {
-                sql: format!(
-                    "UPDATE macro_elements SET \"{col}\" = ? WHERE id = ?;",
-                    col = macro_type.to_string()
-                ),
-                bind: Some(vec![
-                    product.macro_elements[macro_type].into(),
-                    product_id.into(),
-                ]),
-            });
+            macro_bind_all.push(Value::from(product.macro_elements[m]));
         }
+        stmts.push(SqlStatement {
+            sql: format!(
+                "INSERT INTO macro_elements (id, {cols}) VALUES ({ph}) \
+                 ON CONFLICT(id) DO UPDATE SET {updates};",
+                cols = macro_cols
+                    .iter()
+                    .map(|c| format!("\"{c}\""))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                ph = macro_placeholders,
+                updates = macro_updates
+            ),
+            bind: Some(macro_bind_all),
+        });
 
+        let micro_cols: Vec<String> = MicroNutrientsType::iter().map(|m| m.to_string()).collect();
+        let micro_placeholders = std::iter::repeat("?")
+            .take(MicroNutrientsType::COUNT + 1)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let micro_updates = micro_cols
+            .iter()
+            .map(|c| format!("\"{c}\" = excluded.\"{c}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut micro_bind_all = Vec::with_capacity(MicroNutrientsType::COUNT + 1);
+        micro_bind_all.push(Value::from(product_id));
         for micro_type in MicroNutrientsType::iter() {
             let val = match product.micro_nutrients[micro_type] {
                 Some(v) => Value::from(v),
                 None => Value::Null,
             };
-            stmts.push(SqlStatement {
-                sql: format!(
-                    "UPDATE micronutrients SET \"{col}\" = ? WHERE id = ?;",
-                    col = micro_type.to_string()
-                ),
-                bind: Some(vec![val, product_id.into()]),
-            });
+            micro_bind_all.push(val);
         }
+        stmts.push(SqlStatement {
+            sql: format!(
+                "INSERT INTO micronutrients (id, {cols}) VALUES ({ph}) \
+                 ON CONFLICT(id) DO UPDATE SET {updates};",
+                cols = micro_cols
+                    .iter()
+                    .map(|c| format!("\"{c}\""))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                ph = micro_placeholders,
+                updates = micro_updates
+            ),
+            bind: Some(micro_bind_all),
+        });
 
+        let allowed_cols: Vec<String> = AllowedUnitsType::iter()
+            .flat_map(|u| {
+                let base = u.to_string();
+                vec![base.clone(), format!("{base} divider")]
+            })
+            .collect();
+        let allowed_placeholders = std::iter::repeat("?")
+            .take(allowed_cols.len() + 1)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let allowed_updates = allowed_cols
+            .iter()
+            .map(|c| format!("\"{c}\" = excluded.\"{c}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut allowed_bind_all = Vec::with_capacity(allowed_cols.len() + 1);
+        allowed_bind_all.push(Value::from(product_id));
         for unit in AllowedUnitsType::iter() {
             let entry = product.allowed_units.get(&unit);
-            let amount = entry
-                .map(|u| u.amount)
-                .map(Value::from)
-                .unwrap_or(Value::Null);
-            let divider = entry
-                .map(|u| u.divider)
-                .map(Value::from)
-                .unwrap_or(Value::Null);
-            let col = unit.to_string();
-            stmts.push(SqlStatement {
-                sql: format!(
-                    "UPDATE allowed_units SET \"{col}\" = ?, \"{col} divider\" = ? WHERE id = ?;"
-                ),
-                bind: Some(vec![amount, divider, product_id.into()]),
-            });
+            allowed_bind_all.push(entry.map(|u| Value::from(u.amount)).unwrap_or(Value::Null));
+            allowed_bind_all.push(entry.map(|u| Value::from(u.divider)).unwrap_or(Value::Null));
         }
+        stmts.push(SqlStatement {
+            sql: format!(
+                "INSERT INTO allowed_units (id, {cols}) VALUES ({ph}) \
+                 ON CONFLICT(id) DO UPDATE SET {updates};",
+                cols = allowed_cols
+                    .iter()
+                    .map(|c| format!("\"{c}\""))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                ph = allowed_placeholders,
+                updates = allowed_updates
+            ),
+            bind: Some(allowed_bind_all),
+        });
 
         self.send_exec(stmts).await
     }
