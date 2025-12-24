@@ -17,6 +17,18 @@ pub enum DataBaseTypes {
     Local(String),
 }
 
+impl DataBaseTypes {
+    #[must_use]
+    pub fn supports_writing(&self) -> bool {
+        match self {
+            #[cfg(any(test, feature = "test-utils"))]
+            DataBaseTypes::Mock => true,
+            DataBaseTypes::Local(_) => true,
+            _ => false,
+        }
+    }
+}
+
 pub const LOCAL_DB_DEFAULT_FILE: &str = "local_db.sqlite3";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

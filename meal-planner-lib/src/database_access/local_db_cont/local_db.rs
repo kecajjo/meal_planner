@@ -17,7 +17,7 @@ use local_db_wasm::LocalProductDbConcrete;
 pub struct LocalProductDb {
     inner: LocalProductDbConcrete,
 }
-#[allow(warnings)]
+
 impl LocalProductDb {
     /// Creates a new local database instance backed by `SQLite`.
     pub async fn new(database_file: &str) -> Option<Self> {

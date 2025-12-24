@@ -796,16 +796,16 @@ impl MutableDatabase for LocalProductDbConcrete {
             id = product_id,
         ))?;
 
-        let micro_cols: Vec<String> = MicroNutrientsType::iter()
+        let micro_nutr_cols: Vec<String> = MicroNutrientsType::iter()
             .map(|m| format!("\"{m}\""))
             .collect();
-        let micro_values: Vec<String> = MicroNutrientsType::iter()
+        let micro_nutr_values: Vec<String> = MicroNutrientsType::iter()
             .map(|m| match product.micro_nutrients[m] {
                 Some(v) => v.to_string(),
                 None => "NULL".to_string(),
             })
             .collect();
-        let micro_updates = micro_cols
+        let micro_nutr_updates = micro_nutr_cols
             .iter()
             .map(|c| format!("{c} = excluded.{c}"))
             .collect::<Vec<_>>()
@@ -814,9 +814,9 @@ impl MutableDatabase for LocalProductDbConcrete {
             "INSERT INTO {table} (id, {cols}) VALUES ('{id}', {vals}) \
              ON CONFLICT(id) DO UPDATE SET {updates};",
             table = SqlTablesNames::MicroNutrients,
-            cols = micro_cols.join(", "),
-            vals = micro_values.join(", "),
-            updates = micro_updates,
+            cols = micro_nutr_cols.join(", "),
+            vals = micro_nutr_values.join(", "),
+            updates = micro_nutr_updates,
             id = product_id,
         ))?;
 
@@ -829,16 +829,9 @@ impl MutableDatabase for LocalProductDbConcrete {
         let mut allowed_values = Vec::with_capacity(allowed_cols.len());
         for unit in AllowedUnitsType::iter() {
             let entry = product.allowed_units.get(&unit);
-            allowed_values.push(
-                entry
-                    .map(|u| u.amount.to_string())
-                    .unwrap_or_else(|| "NULL".to_string()),
-            );
-            allowed_values.push(
-                entry
-                    .map(|u| u.divider.to_string())
-                    .unwrap_or_else(|| "NULL".to_string()),
-            );
+            allowed_values.push(entry.map_or_else(|| "NULL".to_string(), |u| u.amount.to_string()));
+            allowed_values
+                .push(entry.map_or_else(|| "NULL".to_string(), |u| u.divider.to_string()));
         }
         let allowed_updates = allowed_cols
             .iter()
@@ -1371,7 +1364,7 @@ mod tests {
     }
 
     #[test]
-    fn test_06_update_product_modifies_macro_and_micro_values() {
+    fn test_06_update_product_modifies_macro_and_micro_nutr_values() {
         let test_db = TestDbGuard::create_seeded().expect("Failed to prepare seeded database");
         let mut db = test_db.local_db();
         let mut allowed_units: AllowedUnits = HashMap::new();

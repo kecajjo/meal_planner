@@ -1,3 +1,18 @@
+.button--danger {
+    background-color: #dc2626 !important;
+    color: #fff !important;
+    border: 2px solid #b91c1c !important;
+    font-weight: 600 !important;
+    transition: background 0.2s, color 0.2s, border-color 0.2s !important;
+}
+
+.button--danger:hover,
+.button--danger:focus-visible {
+    background-color: #b91c1c !important;
+    color: #fff !important;
+    border-color: #dc2626 !important;
+}
+
 :root {
     --color-bg: #0f1116;
     --color-surface: rgba(30, 41, 59, 0.65);

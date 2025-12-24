@@ -1,3 +1,5 @@
+#![cfg_attr(debug_assertions, allow(dead_code))]
+
 use dioxus::prelude::*;
 use dioxus_i18n::prelude::{use_init_i18n, I18nConfig};
 use dioxus_i18n::unic_langid::langid;
@@ -55,7 +57,9 @@ fn App() -> Element {
         document::Link { rel: "stylesheet", href: DB_MANAGER_CSS }
         document::Link { rel: "stylesheet", href: PRODUCT_RELATED_CSS }
 
-        div { class: "app-shell", style: format!("--action-bar-width: {}px;", sidebar_width()),
+        div {
+            class: "app-shell",
+            style: format!("--action-bar-width: {}px;", sidebar_width()),
             ActionBar { selection, sidebar_open, sidebar_width }
             MainView { selection }
         }

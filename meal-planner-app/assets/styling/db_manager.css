@@ -1,6 +1,6 @@
 /* Styles for DbManagerView component */
 
-.db-add-btn {
+.db-button {
     margin-top: 2rem;
     font-size: 1.1rem;
     padding: 0.6rem 2.2rem;
@@ -13,8 +13,8 @@
     transition: background 0.2s;
 }
 
-.db-add-btn:hover,
-.db-add-btn:focus {
+.db-button:hover,
+.db-button:focus {
     background: var(--color-primary-strong);
     outline: none;
 }

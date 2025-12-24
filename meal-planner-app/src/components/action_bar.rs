@@ -60,6 +60,8 @@ use android_constants::*;
 #[cfg(not(target_os = "android"))]
 use non_android_constants::*;
 
+const LANG_OPTIONS: [(&str, &str); 2] = [("en-US", "lang-english"), ("pl-PL", "lang-polish")];
+
 #[component]
 pub fn ActionBar(
     mut selection: Signal<ViewKind>,
@@ -81,8 +83,6 @@ pub fn ActionBar(
     } else {
         "action-bar"
     };
-
-    const LANG_OPTIONS: [(&str, &str); 2] = [("en-US", "lang-english"), ("pl-PL", "lang-polish")];
 
     rsx! {
         // for small screen - suggests there is a side bar which is closed
@@ -206,10 +206,13 @@ pub fn ActionBar(
                     role: "separator",
                     aria_label: "Resize sidebar",
                     onpointerdown: move |evt| {
-                        resize_session.set(Some(ResizeSession {
-                            start_x: pointer_x(&evt),
-                            start_width: sidebar_width(),
-                        }));
+                        resize_session
+                            .set(
+                                Some(ResizeSession {
+                                    start_x: pointer_x(&evt),
+                                    start_width: sidebar_width(),
+                                }),
+                            );
                     },
                 }
             }

@@ -1,6 +1,6 @@
-use dioxus_i18n::t;
 use dioxus::html::geometry::WheelDelta;
 use dioxus::prelude::*;
+use dioxus_i18n::t;
 use meal_planner_lib::data_types::{
     MacroElements as DataMacroElements, MacroElementsType as DataMEType,
 };
