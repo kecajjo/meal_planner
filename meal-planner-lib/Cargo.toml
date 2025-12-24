@@ -41,7 +41,7 @@ console_log = "1"
 wasm-bindgen-test = "0.3.45"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-libsqlite3-sys = "0.28.0"
+libsqlite3-sys = { version = "0.28.0", features = ["bundled"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 sqlite-wasm-rs = { version = "0.4.8", default-features = false, features = [

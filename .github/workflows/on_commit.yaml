@@ -39,6 +39,8 @@ jobs:
         run: dx build --platform linux -p meal-planner-app
       - name: build dioxus android app
         run: dx build --platform android -p meal-planner-app
+      - name: build dioxus android app (aarch64)
+        run: dx build --platform android --target aarch64-linux-android -p meal-planner-app
       - name: build dioxus web app
         run: dx build --platform web -p meal-planner-app
 
