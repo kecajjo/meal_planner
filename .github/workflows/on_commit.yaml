@@ -16,7 +16,7 @@ jobs:
     name: Build and test
     runs-on: [self-hosted, dioxus, linux]
     container:
-      image: jacekmultan/meal-planner-rust:0.4.5
+      image: jacekmultan/meal-planner-rust:0.4.6
       options: --user 1000
     env:
       HOME: /home/developer
@@ -39,6 +39,8 @@ jobs:
         run: dx build --platform linux -p meal-planner-app
       - name: build dioxus android app
         run: dx build --platform android -p meal-planner-app
+      - name: build dioxus android app (aarch64)
+        run: dx build --platform android --target aarch64-linux-android -p meal-planner-app
       - name: build dioxus web app
         run: dx build --platform web -p meal-planner-app
 
@@ -47,7 +49,7 @@ jobs:
   #   timeout-minutes: 60
   #   runs-on: [self-hosted, dioxus, linux]
   #   container:
-  #     image: jacekmultan/meal-planner-rust:0.4.3
+  #     image: jacekmultan/meal-planner-rust:0.4.6
   #     options: --user 1000
   #   env:
   #     HOME: /home/developer

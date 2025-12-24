@@ -1,0 +1,196 @@
+.micro-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+}
+
+.micro-title {
+    font-weight: 600;
+    margin: 0;
+}
+
+.micro-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 0.75rem;
+}
+
+.micro-label {
+    font-weight: 500;
+    min-width: 7rem;
+}
+
+.micro-controls {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.micro-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--color-border);
+    border-right: 0;
+    border-radius: 0.35rem 0 0 0.35rem;
+    background: transparent;
+    color: inherit;
+    font-size: 0.95rem;
+}
+
+.nutrient-input {
+    width: 10rem;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.35rem;
+    background: transparent;
+    color: inherit;
+}
+
+.nutrient-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+.nutrient-input--disabled,
+.nutrient-input:disabled {
+    background: transparent;
+    color: inherit;
+    cursor: not-allowed;
+}
+
+.micro-input {
+    border-radius: 0 0.35rem 0.35rem 0;
+}
+
+.allowed-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+}
+
+.allowed-title {
+    font-weight: 600;
+    margin: 0;
+}
+
+.allowed-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.allowed-label {
+    font-weight: 500;
+}
+
+.allowed-select,
+.allowed-input {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.35rem;
+    background: transparent;
+    color: inherit;
+}
+
+.allowed-select option {
+    color: var(--color-contrast-text);
+    background: var(--color-select-bg);
+}
+
+.allowed-select option:focus,
+.allowed-select option:checked,
+.allowed-select option:hover {
+    background: var(--color-select-focus-bg) !important;
+    color: var(--color-contrast-text) !important;
+}
+
+/* Fallback for platforms that ignore option:hover */
+.allowed-select:hover {
+    background: var(--color-select-hover-bg);
+}
+
+.allowed-select option:disabled {
+    color: var(--color-disabled-text);
+}
+
+.allowed-select:focus,
+.allowed-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+
+.allowed-select {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    appearance: none;
+    padding-right: 2rem;
+    background-image:
+        linear-gradient(45deg, transparent 50%, var(--color-highlight) 50%),
+        linear-gradient(135deg, var(--color-highlight) 50%, transparent 50%),
+        linear-gradient(to right, var(--color-border), var(--color-border));
+    background-position:
+        calc(100% - 1.2rem) calc(50% - 0.1rem),
+        calc(100% - 0.75rem) calc(50% - 0.1rem),
+        calc(100% - 1.9rem) 50%;
+    background-size: 0.4rem 0.4rem, 0.4rem 0.4rem, 1px 60%;
+    background-repeat: no-repeat;
+}
+
+.allowed-add,
+.allowed-remove {
+    padding: 0.4rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 0.35rem;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.allowed-add:disabled,
+.allowed-remove:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.collapsible {
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    margin-top: 0.75rem;
+    background: transparent;
+}
+
+.collapsible__header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    color: inherit;
+    text-align: left;
+}
+
+.collapsible__chevron {
+    width: 1rem;
+    text-align: center;
+}
+
+.collapsible__title {
+    flex: 1;
+}
+
+.collapsible__content {
+    padding: 0.1rem 0.8rem 0.8rem;
+}

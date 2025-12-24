@@ -1,16 +1,27 @@
+#![cfg_attr(debug_assertions, allow(dead_code))]
+
 use dioxus::prelude::*;
+use dioxus_i18n::prelude::{use_init_i18n, I18nConfig};
+use dioxus_i18n::unic_langid::langid;
 
 /// Define a components module that contains all shared components for our app.
 mod components;
 
 use components::{
     action_bar::ActionBar,
+    layout::SidebarLayoutContext,
     main_view::{MainView, ViewKind},
 };
 
 // The asset macro also minifies some assets like CSS and JS to make bundled smaller
-const MAIN_CSS: Asset = asset!("/assets/styling/side_bar.css");
+const SIDE_BAR_CSS: Asset = asset!("/assets/styling/side_bar.css");
+const DB_MANAGER_CSS: Asset = asset!("/assets/styling/db_manager.css");
+const PRODUCT_RELATED_CSS: Asset = asset!("/assets/styling/product_related.css");
+const MAIN_CSS: Asset = asset!("/assets/styling/main.css");
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
+
+const EN_US_FTL: &str = include_str!("../assets/locales/en-US/main.ftl");
+const PL_PL_FTL: &str = include_str!("../assets/locales/pl-PL/main.ftl");
 
 fn main() {
     // The `launch` function is the main entry point for a dioxus app. It takes a component and renders it with the platform feature
@@ -24,8 +35,17 @@ fn main() {
 /// Components should be annotated with `#[component]` to support props, better error messages, and autocomplete
 #[component]
 fn App() -> Element {
+    let _i18n = use_init_i18n(|| {
+        I18nConfig::new(langid!("en-US"))
+            .with_fallback(langid!("en-US"))
+            .with_locale((langid!("en-US"), EN_US_FTL))
+            .with_locale((langid!("pl-PL"), PL_PL_FTL))
+    });
     let selection = use_signal(|| ViewKind::MealPlan);
     let sidebar_open = use_signal(|| false);
+    let sidebar_width = use_signal(|| 224.0_f32);
+
+    use_context_provider(|| SidebarLayoutContext { sidebar_width });
 
     // The `rsx!` macro lets us define HTML inside of rust. It expands to an Element with all of our HTML inside.
     rsx! {
@@ -33,9 +53,14 @@ fn App() -> Element {
         // we are using the `document::Link` component to add a link to our favicon and main CSS file into the head of our app.
         document::Link { rel: "stylesheet", href: MAIN_CSS }
         document::Link { rel: "stylesheet", href: TAILWIND_CSS }
+        document::Link { rel: "stylesheet", href: SIDE_BAR_CSS }
+        document::Link { rel: "stylesheet", href: DB_MANAGER_CSS }
+        document::Link { rel: "stylesheet", href: PRODUCT_RELATED_CSS }
 
-        div { class: "app-shell text-slate-900",
-            ActionBar { selection, sidebar_open }
+        div {
+            class: "app-shell",
+            style: format!("--action-bar-width: {}px;", sidebar_width()),
+            ActionBar { selection, sidebar_open, sidebar_width }
             MainView { selection }
         }
     }

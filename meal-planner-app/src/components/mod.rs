@@ -5,5 +5,7 @@
 pub mod action_bar;
 pub mod db_manager;
 pub mod food_swapper;
+pub mod layout;
 pub mod main_view;
 pub mod meal_planner;
+pub mod product_related;

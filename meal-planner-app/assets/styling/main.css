@@ -1,0 +1,200 @@
+.button--danger {
+    background-color: #dc2626 !important;
+    color: #fff !important;
+    border: 2px solid #b91c1c !important;
+    font-weight: 600 !important;
+    transition: background 0.2s, color 0.2s, border-color 0.2s !important;
+}
+
+.button--danger:hover,
+.button--danger:focus-visible {
+    background-color: #b91c1c !important;
+    color: #fff !important;
+    border-color: #dc2626 !important;
+}
+
+:root {
+    --color-bg: #0f1116;
+    --color-surface: rgba(30, 41, 59, 0.65);
+    --color-surface-strong: #334155;
+    --color-text: #ffffff;
+    --color-text-muted: #e2e8f0;
+    --color-highlight: #facc15;
+    --color-border: #cbd5e1;
+    --color-border-strong: #1f2937;
+    --color-primary: #6366f1;
+    --color-primary-strong: #4f46e5;
+    --color-popup-bg: #111827;
+    --color-popup-border: #1f2937;
+    --color-popup-hover: #0b1220;
+    --color-popup-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+    --color-shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.10);
+    --color-focus-ring: rgba(99, 102, 241, 0.3);
+    --color-contrast-text: #0f172a;
+    --color-select-bg: #1f2937;
+    --color-select-focus-bg: #334155;
+    --color-select-hover-bg: #273244;
+    --color-disabled-text: rgba(226, 232, 240, 0.55);
+    --action-bar-width: 14rem;
+}
+
+body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    min-height: 100vh;
+    overflow: hidden;
+}
+
+.app-shell {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.app-theme {
+    background: var(--color-bg);
+    color: var(--color-text);
+    color-scheme: dark;
+}
+
+.app-theme * {
+    color: inherit;
+}
+
+.content-shell {
+    flex: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+    min-height: 0;
+    display: block;
+    position: relative;
+}
+
+#header {
+    max-width: 1200px;
+}
+
+
+.navigation-button {
+    background-color: transparent;
+    color: var(--color-text-muted);
+    border: 2px solid var(--color-border);
+    padding: 0.6rem 0.9rem;
+    margin: 0.25rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    font-size: 1rem;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.10);
+    transition: background-color 0.3s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s;
+}
+
+.navigation-button:hover,
+.navigation-button:focus-visible {
+    background-color: var(--color-surface);
+    border-color: var(--color-highlight);
+    color: var(--color-highlight);
+    outline: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.navigation-button--selected {
+    background-color: var(--color-surface-strong);
+    color: var(--color-highlight);
+    font-weight: 700;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.22);
+    border-color: var(--color-highlight);
+    border-width: 2.5px;
+}
+
+.navigation-button-bar {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+}
+
+.view-content {
+    color: var(--color-text-muted);
+    font-size: 2rem;
+    margin-top: 2rem;
+    margin-left: 2rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+}
+
+.arrow-back-button {
+    color: inherit;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+    padding: 0;
+}
+
+.arrow-back-button:hover,
+.arrow-back-button:focus-visible {
+    color: var(--color-highlight);
+}
+
+.product-overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: var(--action-bar-width);
+    z-index: 60;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 2rem 1.5rem;
+    pointer-events: none;
+}
+
+.product-overlay__backdrop {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: var(--action-bar-width);
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    pointer-events: auto;
+    z-index: 60;
+    touch-action: none;
+    overscroll-behavior: contain;
+}
+
+.product-overlay__panel {
+    pointer-events: auto;
+    background: var(--color-popup-bg);
+    border: 1px solid var(--color-popup-border);
+    box-shadow: var(--color-popup-shadow);
+    border-radius: 1rem;
+    padding: 1.25rem 1.5rem;
+    width: min(90vw, 52rem);
+    max-height: calc(100vh - 3rem);
+    overflow: auto;
+    margin-top: 0.5rem;
+    z-index: 65;
+    backdrop-filter: none;
+}
+
+.view-content--overlay {
+    margin: 0 0 1rem 0;
+    font-size: 1.25rem;
+}
+
+@media (max-width: 768px) {
+
+    .product-overlay,
+    .product-overlay__backdrop {
+        left: 0;
+    }
+
+    .product-overlay__panel {
+        width: min(95vw, 48rem);
+        max-height: calc(100vh - 2rem);
+    }
+}

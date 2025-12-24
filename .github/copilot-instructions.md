@@ -49,3 +49,6 @@ This could panic if the vector is empty. Consider using `.get(0)` or adding a le
 ### When to Stay Silent
 
 If you’re uncertain whether something is an issue, don’t comment.
+
+### Tests
+Tests should be run from console not using IDE features as they are not configured properly.

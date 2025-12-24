@@ -1,0 +1,43 @@
+/* Styles for DbManagerView component */
+
+.db-button {
+    margin-top: 2rem;
+    font-size: 1.1rem;
+    padding: 0.6rem 2.2rem;
+    border-radius: 0.4rem;
+    border: 2px solid var(--color-border);
+    background: var(--color-primary);
+    color: var(--color-text);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.db-button:hover,
+.db-button:focus {
+    background: var(--color-primary-strong);
+    outline: none;
+}
+
+.db-popup {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-popup-bg);
+    color: var(--color-text);
+    padding: 0.9rem 1.4rem;
+    border-radius: 0.5rem;
+    box-shadow: var(--color-popup-shadow);
+    border: 1px solid var(--color-popup-border);
+    cursor: pointer;
+    z-index: 1000;
+    min-width: 240px;
+    text-align: center;
+}
+
+.db-popup:hover,
+.db-popup:focus {
+    background: var(--color-popup-hover);
+    outline: none;
+}

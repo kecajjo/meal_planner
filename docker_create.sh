@@ -3,7 +3,7 @@ scriptDir=$(dirname $0 | xargs -i readlink -f {})
 docker_registry_path="jacekmultan"
 container_name="meal-planner-rust"
 image_name=${docker_registry_path}/${container_name}
-version="0.4.5"
+version="0.4.6"
 does_exist=$(docker image ls $image_name:$version | grep -ci1 $container_name)
 if [ $does_exist == "0" ] ; then
 	docker build -t $image_name:$version $scriptDir/

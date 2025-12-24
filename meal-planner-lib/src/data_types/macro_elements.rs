@@ -1,4 +1,5 @@
 use core::fmt;
+use serde::{Deserialize, Serialize};
 use std::{
     hash::Hash,
     ops::{Add, Index},
@@ -6,7 +7,7 @@ use std::{
 use strum::IntoEnumIterator;
 use strum_macros::{EnumCount, EnumIter};
 
-#[derive(EnumIter, PartialEq, Eq, Hash, Copy, Clone, Debug, EnumCount)]
+#[derive(EnumIter, PartialEq, Eq, Hash, Copy, Clone, Debug, EnumCount, Serialize, Deserialize)]
 pub enum MacroElementsType {
     Fat,
     SaturatedFat,
@@ -31,7 +32,7 @@ impl fmt::Display for MacroElementsType {
 }
 
 /// Macro elements per 100g
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MacroElements {
     elements: std::collections::HashMap<MacroElementsType, f32>,
 }

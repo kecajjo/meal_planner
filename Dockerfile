@@ -86,10 +86,6 @@ USER developer
     ENV PATH="/usr/local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:$PATH"
 
     WORKDIR /home/developer/repo
-<<<<<<< HEAD
-    ENV PATH="/usr/local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:$PATH"
-=======
->>>>>>> bd68501 (maybe this time)
 
 USER root
 RUN echo 'developer ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/developer && \
@@ -162,8 +158,15 @@ RUN apt-get update && \
 RUN apt-get update && \
     apt-get install -y curl && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
+    apt-get install -y nodejs clang && \
     rm -rf /var/lib/apt/lists/*
+
+RUN apt update && \
+    apt install -y debian-keyring debian-archive-keyring apt-transport-https && \
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg && \
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list && \
+    apt update && \
+    apt install -y caddy
 
 ENV PATH="/usr/local/cargo/bin:/home/developer/.cargo/bin:/usr/local/bin:/home/developer/.local/bin:/opt/android-sdk/emulator:/opt/android-sdk/tools:/opt/android-sdk/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/cmdline-tools/latest/bin:$PATH"
 ENV ANDROID_HOME=/opt/android-sdk
@@ -175,6 +178,7 @@ ENV RUSTUP_HOME=/home/developer/.rustup
 RUN chown developer:developer /home/developer/.profile
 
 USER developer
+RUN cargo binstall wasm-bindgen-cli --force
 RUN mkdir -p /home/developer/.local/share/.dx/tailwind && \
     curl -L https://github.com/tailwindlabs/tailwindcss/releases/download/v4.1.5/tailwindcss-linux-x64 \
     -o /home/developer/.local/share/.dx/tailwind/tailwindcss-v4.1.5 && \

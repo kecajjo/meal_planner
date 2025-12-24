@@ -336,7 +336,7 @@ mod tests {
 
         let mut allowed_units = HashMap::new();
         allowed_units.insert(
-            AllowedUnitsType::Gram,
+            AllowedUnitsType::Piece,
             UnitData {
                 amount: gram_amount,
                 divider: gram_divider,
@@ -521,7 +521,7 @@ mod tests {
                     Box::new(eggs.clone()),
                     Some(50),
                     Some(300),
-                    AllowedUnitsType::Gram,
+                    AllowedUnitsType::Piece,
                 )
                 .expect("eggs constraint should be valid"),
             ],
@@ -537,14 +537,14 @@ mod tests {
                     Box::new(beans.clone()),
                     Some(100),
                     Some(300),
-                    AllowedUnitsType::Gram,
+                    AllowedUnitsType::Piece,
                 )
                 .expect("beans constraint should be valid"),
                 ProductConstraint::new(
                     Box::new(spinach.clone()),
                     Some(0),
                     Some(100),
-                    AllowedUnitsType::Gram,
+                    AllowedUnitsType::Piece,
                 )
                 .expect("spinach constraint should be valid"),
             ],
@@ -611,7 +611,7 @@ mod tests {
                 amount_unit,
             } => {
                 assert_eq!(product.name(), "Eggs");
-                assert_eq!(*unit, AllowedUnitsType::Gram);
+                assert_eq!(*unit, AllowedUnitsType::Piece);
                 assert_eq!(amount_unit.denominator, 1);
                 assert_relative_eq!(*amount_grams, 100.0, epsilon = 1e-6);
                 (*amount_grams, amount_unit.numerator)
@@ -637,14 +637,14 @@ mod tests {
                     amount_unit,
                 } => match product.name() {
                     "Beans" => {
-                        assert_eq!(*unit, AllowedUnitsType::Gram);
+                        assert_eq!(*unit, AllowedUnitsType::Piece);
                         assert_eq!(amount_unit.denominator, 1);
                         assert_relative_eq!(*amount_grams, 200.0, epsilon = 1e-6);
                         beans_amount = Some(*amount_grams);
                         beans_units = Some(amount_unit.numerator);
                     }
                     "Spinach" => {
-                        assert_eq!(*unit, AllowedUnitsType::Gram);
+                        assert_eq!(*unit, AllowedUnitsType::Piece);
                         assert_eq!(amount_unit.denominator, 1);
                         assert_relative_eq!(*amount_grams, 50.0, epsilon = 1e-6);
                         spinach_amount = Some(*amount_grams);

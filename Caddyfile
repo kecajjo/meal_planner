@@ -1,0 +1,8 @@
+:8090
+
+header {
+	Cross-Origin-Opener-Policy "same-origin"
+	Cross-Origin-Embedder-Policy "require-corp"
+}
+root * ./target/dx/meal-planner-app/debug/web/public
+file_server

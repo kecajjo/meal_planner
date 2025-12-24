@@ -1,4 +1,5 @@
 use core::fmt;
+use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use strum_macros::{EnumCount, EnumIter};
 
@@ -13,7 +14,7 @@ pub enum NutrientType {
     Micro(MicroNutrientsType),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter, EnumCount)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, EnumIter, EnumCount, Serialize, Deserialize)]
 pub enum AllowedUnitsType {
     Gram,
     Piece,
@@ -47,7 +48,7 @@ const DEFAULT_ALLOWED_UNITS: (AllowedUnitsType, UnitData) = (
     },
 );
 
-#[derive(Debug, Clone, PartialEq, Eq, Copy, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Hash, Serialize, Deserialize)]
 pub struct UnitData {
     pub amount: u16,
     pub divider: u16,
@@ -55,7 +56,7 @@ pub struct UnitData {
 
 pub type AllowedUnits = std::collections::HashMap<AllowedUnitsType, UnitData>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Product {
     name: String,
     brand: Option<String>,
@@ -73,9 +74,7 @@ impl Product {
         micro_nutrients: Box<MicroNutrients>,
         mut allowed_units: AllowedUnits,
     ) -> Self {
-        if allowed_units.is_empty() {
-            allowed_units.insert(DEFAULT_ALLOWED_UNITS.0, DEFAULT_ALLOWED_UNITS.1);
-        }
+        allowed_units.insert(DEFAULT_ALLOWED_UNITS.0, DEFAULT_ALLOWED_UNITS.1);
         Self {
             name,
             brand,
@@ -130,7 +129,7 @@ mod tests {
             {
                 let mut allowed_units = std::collections::HashMap::new();
                 allowed_units.insert(
-                    AllowedUnitsType::Gram,
+                    AllowedUnitsType::Piece,
                     UnitData {
                         amount: 123,
                         divider: 1,
@@ -145,9 +144,16 @@ mod tests {
         assert_eq!(product.micro_nutrients[MicroNutrientsType::Fiber], None);
         let mut expected_allowed_units = std::collections::HashMap::new();
         expected_allowed_units.insert(
-            AllowedUnitsType::Gram,
+            AllowedUnitsType::Piece,
             UnitData {
                 amount: 123,
+                divider: 1,
+            },
+        );
+        expected_allowed_units.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 1,
                 divider: 1,
             },
         );
@@ -296,13 +302,29 @@ mod tests {
                 divider: 1,
             },
         );
+        allowed_units.insert(
+            AllowedUnitsType::Piece,
+            UnitData {
+                amount: 7,
+                divider: 1,
+            },
+        );
+        // Gram will always be present due to Product::new
+        let mut expected_units = allowed_units.clone();
+        expected_units.insert(
+            AllowedUnitsType::Gram,
+            UnitData {
+                amount: 1,
+                divider: 1,
+            },
+        );
         let product = Product::new(
             "MultiUnit".to_string(),
             None,
             macro_elements,
             micro_nutrients,
-            allowed_units.clone(),
+            allowed_units,
         );
-        assert_eq!(product.allowed_units, allowed_units);
+        assert_eq!(product.allowed_units, expected_units);
     }
 }
