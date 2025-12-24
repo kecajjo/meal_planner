@@ -42,6 +42,9 @@ fn ordered_units(units: &DataAllowedUnits) -> Vec<(AllowedUnitsType, UnitData)> 
     list
 }
 
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
+#[allow(clippy::redundant_closure)]
 #[component]
 pub fn AllowedUnits(ad_signal: Signal<DataAllowedUnits>, editable: bool) -> Element {
     let mut rows_signal = use_signal(|| ordered_units(&ad_signal()));
@@ -56,7 +59,7 @@ pub fn AllowedUnits(ad_signal: Signal<DataAllowedUnits>, editable: bool) -> Elem
             let mut updated_rows = Vec::new();
             let mut seen = HashSet::new();
 
-            for (unit, _) in rows_signal().iter() {
+            for (unit, _) in &rows_signal() {
                 if let Some(data) = incoming.get(unit) {
                     updated_rows.push((*unit, *data));
                     seen.insert(*unit);

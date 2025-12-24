@@ -5,6 +5,7 @@ use dioxus_i18n::t;
 use meal_planner_lib::data_types::Product as ProductData;
 use meal_planner_lib::database_access as db_access;
 
+#[allow(clippy::match_wildcard_for_single_variants)]
 fn db_type_to_string(db_type: &db_access::DataBaseTypes) -> String {
     match db_type {
         db_access::DataBaseTypes::Local(_) => t!("db-type-local"),
@@ -14,8 +15,8 @@ fn db_type_to_string(db_type: &db_access::DataBaseTypes) -> String {
 
 #[component]
 pub fn Search() -> Element {
-    let mut query = use_signal(|| "".to_string());
-    let mut input_value = use_signal(|| "".to_string());
+    let mut query = use_signal(String::new);
+    let mut input_value = use_signal(String::new);
     let mut selected_db_type = use_signal(|| None as Option<db_access::DataBaseTypes>);
     let mut selected_product = use_signal(|| None as Option<ProductData>);
     let operation_results = use_signal(|| None as Option<Result<(), String>>);
@@ -55,12 +56,12 @@ pub fn Search() -> Element {
 
     let product_overlay = if let Some(db_type) = selected_db_type() {
         create_product_overlay(
-            EventHandler::new(move |_| {
+            EventHandler::new(move |()| {
                 selected_db_type.set(None);
                 selected_product.set(None);
             }),
             selected_product,
-            db_type,
+            &db_type,
             operation_results,
         )
     } else {

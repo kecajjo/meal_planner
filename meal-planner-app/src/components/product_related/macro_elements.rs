@@ -46,13 +46,13 @@ fn MacroElementSingleInputField(
                     },
                     onmounted: move |e| {
                         let Event { data, .. } = e;
-                        match Rc::try_unwrap(data) {
-                            Ok(mounted) => input_ref.set(Some(mounted)),
-                            Err(_) => panic!("Element not mounted properly in EditableTextInput"),
-                        }
+                        let mounted = Rc::try_unwrap(data)
+                            .expect("Element not mounted properly in EditableTextInput");
+                        input_ref.set(Some(mounted));
                     },
                     onkeydown: move |e| {
                         if e.key() == Key::Enter || e.key() == Key::Escape {
+                            #[allow(clippy::let_underscore_future)]
                             if let Some(input) = input_ref.read().as_ref() {
                                 let _ = input.set_focus(false);
                             }
@@ -162,7 +162,7 @@ pub fn MacroElements(me_signal: Signal<DataMacroElements>, editable: bool) -> El
             }
             div {
                 {format!("{}: ", t!("label-calories"))}
-                {format!("{:.2}", calories)}
+                {format!("{calories:.2}")}
             }
         }
     }

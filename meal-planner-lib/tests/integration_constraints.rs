@@ -25,9 +25,11 @@ fn extract_single_product<'a>(
     f64,
     &'a meal_planner_lib::constraints_solver::Fraction,
 ) {
-    let week_entries = match solution {
-        SolutionEntry::Week { entries } => entries,
-        _ => panic!("Expected week entry"),
+    let SolutionEntry::Week {
+        entries: week_entries,
+    } = solution
+    else {
+        panic!("Expected week entry")
     };
     assert_eq!(week_entries.len(), 1, "Expected single day in plan");
 
@@ -122,7 +124,7 @@ fn test_user_can_build_day_plan_from_mock_db() {
                 .expect("fiber data should exist"),
         );
         let total_fiber = (fiber_per_100 / 100.0) * grams;
-        assert!(total_fiber >= 5.0 - 1e-6 && total_fiber <= 6.0 + 1e-6);
+        assert!((5.0 - 1e-6..=6.0 + 1e-6).contains(&total_fiber));
 
         let calories_per_100 = f64::from(
             product
@@ -130,7 +132,7 @@ fn test_user_can_build_day_plan_from_mock_db() {
                 .expect("calorie data should exist"),
         );
         let total_calories = (calories_per_100 / 100.0) * grams;
-        assert!(total_calories >= 50.0 - 1e-6 && total_calories <= 70.0 + 1e-6);
+        assert!((50.0 - 1e-6..=70.0 + 1e-6).contains(&total_calories));
     });
 }
 
@@ -181,6 +183,7 @@ fn test_user_receives_infeasible_error_from_mock_db() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn test_user_retrieves_multi_meal_solution_from_mock_db() {
     block_on(async {
         let db = mock_db().await;
@@ -249,9 +252,11 @@ fn test_user_retrieves_multi_meal_solution_from_mock_db() {
             .solve_day(&day_constraints)
             .expect("solution should be feasible");
 
-        let week_entries = match &solution.solution {
-            SolutionEntry::Week { entries } => entries,
-            _ => panic!("Expected week entry"),
+        let SolutionEntry::Week {
+            entries: week_entries,
+        } = &solution.solution
+        else {
+            panic!("Expected week entry")
         };
         assert_eq!(week_entries.len(), 1, "Expected single day");
 
@@ -323,7 +328,7 @@ fn test_user_retrieves_multi_meal_solution_from_mock_db() {
         );
         let total_fiber =
             (apple_fiber / 100.0) * breakfast_grams + (banana_fiber / 100.0) * dinner_grams;
-        assert!(total_fiber >= 6.8 - 1e-6 && total_fiber <= 7.2 + 1e-6);
+        assert!((6.8 - 1e-6..=7.2 + 1e-6).contains(&total_fiber));
 
         let apple_protein = f64::from(
             breakfast_product
@@ -337,7 +342,7 @@ fn test_user_retrieves_multi_meal_solution_from_mock_db() {
         );
         let total_protein =
             (apple_protein / 100.0) * breakfast_grams + (banana_protein / 100.0) * dinner_grams;
-        assert!(total_protein >= 4.5 - 1e-6 && total_protein <= 5.5 + 1e-6);
+        assert!((4.5 - 1e-6..=5.5 + 1e-6).contains(&total_protein));
 
         let apple_calories = f64::from(
             breakfast_product
@@ -351,6 +356,6 @@ fn test_user_retrieves_multi_meal_solution_from_mock_db() {
         );
         let total_calories =
             (apple_calories / 100.0) * breakfast_grams + (banana_calories / 100.0) * dinner_grams;
-        assert!(total_calories >= 55.0 - 1e-6 && total_calories <= 65.0 + 1e-6);
+        assert!((55.0 - 1e-6..=65.0 + 1e-6).contains(&total_calories));
     });
 }

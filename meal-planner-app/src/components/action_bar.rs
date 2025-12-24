@@ -138,7 +138,7 @@ pub fn ActionBar(
                 begin_swipe(close_swipe, &evt);
             },
             onpointerup: move |evt| {
-                if let Some(_) = resize_session() {
+                if resize_session().is_some() {
                     resize_session.set(None);
                     return;
                 }

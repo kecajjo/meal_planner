@@ -17,17 +17,14 @@ pub(super) fn operation_triggered(
     mut result_signal: Signal<Option<Result<(), String>>>,
     operation: DbOperation,
 ) {
-    let product = match input() {
-        Some(prod) => prod,
-        None => {
-            result_signal.set(Some(Err(t!("error-no-product"))));
-            return;
-        }
+    let Some(product) = input() else {
+        result_signal.set(Some(Err(t!("error-no-product"))));
+        return;
     };
     let product_id = product.id();
 
     spawn({
-        let mut result_signal = result_signal.clone();
+        let mut result_signal = result_signal;
         async move {
             tracing::info!("Creating DB access");
             let Some(mut db) = db_access::get_mutable_db(db_access::DataBaseTypes::Local(

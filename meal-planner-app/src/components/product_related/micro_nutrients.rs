@@ -40,7 +40,7 @@ fn MicroNutrientInput(
                             class: "micro-input nutrient-input",
                             r#type: "number",
                             step: "0.01",
-                            value: signal().map(|v| format!("{:.2}", v)).unwrap_or_default(),
+                            value: signal().map(|v| format!("{v:.2}")).unwrap_or_default(),
                             placeholder: none_label.clone(),
                             onwheel: move |e| {
                                 e.prevent_default();
@@ -94,7 +94,7 @@ fn MicroNutrientInput(
                 }
             } else {
                 if let Some(val) = signal() {
-                    span { class: "micro-value", {format!("{:.2}", val)} }
+                    span { class: "micro-value", {format!("{val:.2}")} }
                 }
             }
         }

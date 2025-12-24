@@ -10,7 +10,7 @@ use meal_planner_lib::database_access as db_access;
 pub fn create_product_overlay(
     on_close: EventHandler<()>,
     selected_product: Signal<Option<ProductData>>,
-    db_type: db_access::DataBaseTypes,
+    db_type: &db_access::DataBaseTypes,
     operation_results: Signal<Option<Result<(), String>>>,
 ) -> Element {
     let mut current_operation = use_signal(|| DbOperation::None);
