@@ -33,10 +33,6 @@ jobs:
         run: cargo test --workspace --all-targets --features test-utils
       - name: Format
         run: cargo fmt --all -- --check
-      - name: build WASM worker
-        run: cargo build -p meal-planner-lib --bin wasm_worker_main --features __internal-wasm-worker-bin --target wasm32-unknown-unknown --release
-      - name: pack WASM worker
-        run: wasm-bindgen --target web --out-dir pkg-worker target/wasm32-unknown-unknown/release/wasm_worker_main.wasm 
       - name: cargo metadata
         run: cargo metadata
       - name: build dioxus linux app
